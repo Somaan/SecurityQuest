@@ -3,6 +3,15 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { ROUTES } from './Routes';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+    faHouse, 
+    faQuestionCircle, 
+    faTrophy, 
+    faRankingStar, 
+    faChartLine, 
+    faLock 
+} from '@fortawesome/free-solid-svg-icons';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -62,19 +71,46 @@ const Navbar = () => {
             </div>
 
             <div className="nav-links-box">
-                <NavLink to={ROUTES.DASHBOARD}>Dashboard</NavLink>
-                <NavLink to={ROUTES.QUIZ}>Quiz</NavLink>
-                <NavLink to={ROUTES.ACHIEVEMENTS}>Achievements</NavLink>
-                <NavLink to={ROUTES.LEADERBOARD}>Leaderboard</NavLink>
-                <NavLink to={ROUTES.STATISTICS}>Statistics</NavLink>
+                <NavLink to={ROUTES.DASHBOARD}>
+                    <FontAwesomeIcon icon={faHouse} className="nav-icon" /> Dashboard
+                </NavLink>
+                <NavLink to={ROUTES.QUIZ}>
+                    <FontAwesomeIcon icon={faQuestionCircle} className="nav-icon" /> Quiz
+                </NavLink>
+                <NavLink to={ROUTES.ACHIEVEMENTS}>
+                    <FontAwesomeIcon icon={faTrophy} className="nav-icon" /> Achievements
+                </NavLink>
+                <NavLink to={ROUTES.LEADERBOARD}>
+                    <FontAwesomeIcon icon={faRankingStar} className="nav-icon" /> Leaderboard
+                </NavLink>
+                <NavLink to={ROUTES.STATISTICS}>
+                    <FontAwesomeIcon icon={faChartLine} className="nav-icon" /> Statistics
+                </NavLink>
             </div>
             
             <button className="logout-btn" onClick={handleLogout}>
-                Logout
+                <FontAwesomeIcon icon={faLock} className="nav-icon" /> Logout
             </button>
+
+            <style jsx>{`
+                .nav-icon {
+                    margin-right: 10px;
+                    width: 18px;
+                }
+                
+                .nav-links-box a {
+                    display: flex;
+                    align-items: center;
+                }
+                
+                .logout-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+            `}</style>
         </nav>
     );
 };
 
 export default Navbar;
-

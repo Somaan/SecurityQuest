@@ -7,18 +7,34 @@ const CAPTCHA = ({ onSuccess }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const navigate = useNavigate();
 
-  //array to define correct cells in CAPTCHA
-  const correctCellsMap = [
-    new Set([4, 5, 6, 7, 8]), //set1 = 4, 5, 6, 7, 8
-    new Set([0, 1, 3, 4]),    //set2 = 0, 1, 3, 4
-    new Set([2, 3, 4, 5, 8])  //set3 = 2, 3, 4, 5, 8
-  ];
-
+  // Available bus images
   const busImages = [
     '/src/images/bus1.jpg',
     '/src/images/bus2.jpg',
-    '/src/images/bus3.jpg'
+    '/src/images/bus3.jpg',
+    '/src/images/bus4.jpg',
+    '/src/images/bus5.jpg'
   ];
+
+  // Array to define correct cells in CAPTCHA
+  const correctCellsMap = [
+    new Set([4, 5, 6, 7, 8]), 
+    new Set([0, 1, 3, 4]),    
+    new Set([2, 3, 4, 5, 8]),  
+    new Set([4, 5, 7, 8]),
+    new Set([0, 3, 6])
+  ];
+
+  // Randomize image
+  const getRandomImage = () => {
+    const randomIndex = Math.floor(Math.random() * busImages.length);
+    setCurrentImageIndex(randomIndex);
+  };
+
+  // Initialize with random image
+  useEffect(() => {
+    getRandomImage();
+  }, []);
 
   // Prevent navigation across unidentified pages
   useEffect(() => {
@@ -50,21 +66,21 @@ const CAPTCHA = ({ onSuccess }) => {
     const isCorrect = selectedCells.size === currentCorrectCells.size && 
       [...selectedCells].every(cell => currentCorrectCells.has(cell));
     
-      if (isCorrect) {
-        onSuccess(); // Just call the success callback, let parent handle navigation
-      } else {
-        toast.error("Incorrect selection. Please try again.", {
-          position: "top-center",
-          autoClose: 500,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: "dark"
-        });
-        setSelectedCells(new Set());
-        setCurrentImageIndex((prev) => (prev + 1) % busImages.length);
-      }
+    if (isCorrect) {
+      onSuccess(); 
+    } else {
+      toast.error("Incorrect selection. Please try again.", {
+        position: "top-center",
+        autoClose: 500,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: "dark"
+      });
+      setSelectedCells(new Set());
+      getRandomImage(); // new image on incorrect instance
+    }
   };
 
   return (

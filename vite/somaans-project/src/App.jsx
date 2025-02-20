@@ -8,6 +8,8 @@ import { useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { ROUTES, PUBLIC_ROUTES, PROTECTED_ROUTES } from './Routes';
 import 'react-toastify/dist/ReactToastify.css';
+import ForgotPassword from './ForgotPassword';
+import ResetPassword from './ResetPassword';
 
 function App() {
   const location = useLocation();
@@ -30,6 +32,9 @@ function App() {
         <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.LOGIN} replace />} />
         <Route path={ROUTES.LOGIN} element={<Login />} />
         <Route path={ROUTES.REGISTER} element={<Register />} />
+        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
+        <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
+
 
         {/* Protected Routes */}
         <Route path={ROUTES.DASHBOARD} element={

@@ -680,3 +680,18 @@ button:focus-visible {
 .captcha-verify-btn:hover {
   background-color: #357ABD;
 }
+
+.forgot-password-container {
+  text-align: right;
+  margin-top: 0.5rem;
+}
+
+.forgot-password-link {
+  color: #646cff;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.forgot-password-link:hover {
+  text-decoration: underline;
+}

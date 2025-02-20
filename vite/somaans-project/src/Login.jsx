@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from "react-toastify";
 import CAPTCHA from './CAPTCHA';
 import { ROUTES } from './Routes';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faRightToBracket } from '@fortawesome/free-solid-svg-icons';
 
 const LoginForm = () => {
   const navigate = useNavigate();
@@ -141,6 +143,11 @@ const LoginForm = () => {
                       required
                       disabled={isLoading}
                     />
+                    <div className="forgot-password-container">
+                      <Link to={ROUTES.FORGOT_PASSWORD} className="forgot-password-link">
+                      Forgot Password?
+                      </Link>
+                    </div>
                     <span className="char-count">
                       {formData.password.length}/{MAX_LENGTH}
                     </span>
@@ -171,7 +178,10 @@ const LoginForm = () => {
                       Verifying...
                     </div>
                   ) : (
-                    'Login'
+                    <>
+                      <span>Login</span>
+                      <FontAwesomeIcon icon={faRightToBracket} className="login-icon" />
+                    </>
                   )}
                 </button>
                 <style>
@@ -179,6 +189,17 @@ const LoginForm = () => {
                     @keyframes spin {
                       0% { transform: rotate(0deg); }
                       100% { transform: rotate(360deg); }
+                    }
+                    
+                    .login-btn {
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      gap: 10px;
+                    }
+                    
+                    .login-icon {
+                      margin-left: 8px;
                     }
                   `}
                 </style>

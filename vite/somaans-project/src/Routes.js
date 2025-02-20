@@ -7,14 +7,18 @@ export const ROUTES = {
     QUIZ: '/quiz',
     ACHIEVEMENTS: '/achievements',
     LEADERBOARD: '/leaderboard',
-    STATISTICS: '/statistics'
+    STATISTICS: '/statistics',
+    FORGOT_PASSWORD: '/forgot-password',
+    RESET_PASSWORD: '/reset-password',
 };
 
 // Public routes that don't require authentication
 export const PUBLIC_ROUTES = [
     ROUTES.HOME,
     ROUTES.LOGIN,
-    ROUTES.REGISTER
+    ROUTES.REGISTER,
+    ROUTES.FORGOT_PASSWORD,
+    ROUTES.RESET_PASSWORD
 ];
 
 // Protected routes that require authentication
