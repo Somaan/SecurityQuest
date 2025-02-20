@@ -4,8 +4,9 @@ const bcrypt = require('bcrypt');
 const pool = require('./db');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
-
 const app = express();
+
+require('dotenv').config();
 
 // Middleware
 app.use(cors({
@@ -27,7 +28,7 @@ const transporter = nodemailer.createTransport({
     },
     auth: {
         user: "apikey",
-        pass: "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" //constructed api key from sendgrid
+        pass: process.env.SENDGRID_API_KEY //constructed api key from sendgrid
     }
 });
 
