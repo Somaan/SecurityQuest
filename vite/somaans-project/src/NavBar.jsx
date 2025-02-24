@@ -1,4 +1,10 @@
-// NavBar.jsx
+/**
+- Navigation bar components - provides main navigation for authenticated users
+- Features:
+    - Dynamic routing links
+    - Active route highlighting
+    - Logout functionality with confirmation
+ */
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';

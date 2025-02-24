@@ -6,6 +6,15 @@ import { ROUTES } from './Routes';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRightToBracket } from '@fortawesome/free-solid-svg-icons';
 
+/**
+- Handles user authentification and login process
+- Features:
+  - Username/password validation
+  - CAPTCHA verification
+  - Error handling and user feedback 
+  - Redirect on successful login to Dashboard
+ */
+
 const LoginForm = () => {
   const navigate = useNavigate();
   const [showCaptcha, setShowCaptcha] = useState(false);
@@ -73,6 +82,7 @@ const LoginForm = () => {
 };
   const handleCaptchaSuccess = () => {
     sessionStorage.setItem('isAuthenticated', 'true');
+    sessionStorage.setItem('username', formData.username);
     toast.success("Login successful!", {
       position: "top-center",
       autoClose: 2000,

@@ -147,6 +147,7 @@ const Register = () => {
 };
   const handleCaptchaSuccess = () => {
     sessionStorage.setItem('isAuthenticated', 'true');
+    sessionStorage.setItem('username', formData.username);
     toast.success("Login successful!", {
       position: "top-center",
       autoClose: 2000,
@@ -178,7 +179,7 @@ const Register = () => {
       {!showCaptcha ? (
         <>
           <div className="sidebar">
-            <h3 className="sidebar-title">Welcome to the social engineering platform</h3>
+            <h3 className="sidebar-title">Register a new account here</h3>
           </div>
           <div className="content-wrapper">
             <div className="register-form-container">

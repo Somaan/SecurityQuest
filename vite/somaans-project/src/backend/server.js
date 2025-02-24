@@ -2,44 +2,25 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const pool = require('./db');
-const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const sgMail = require('@sendgrid/mail');
 const app = express();
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+
+// Set SendGrid API Key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+// Initial API key check
+console.log('Testing environment setup...');
+console.log('SendGrid API Key loaded:', process.env.SENDGRID_API_KEY ? 'Yes' : 'No');
+console.log('API Key length:', process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.length : 0);
 
 // Middleware
 app.use(cors({
-    origin: 'http://localhost:5173' // Your Vite frontend URL
+    origin: 'http://localhost:5173' 
 }));
 app.use(express.json());
-
-//using gmails 2fa to generate a passkey code
-//user clicks forget password
-//server generates token and saves to database
-//server uses gmail account (via given password) to send an email to the user's address
-//user receives email regardless of email provider - taken to site with token, site then verifies and can create new password - NOT WORKING (authentifcation issues)
-const transporter = nodemailer.createTransport({
-    host: 'smtp.sendgrid.net',
-    port: 587, //smtp port
-    secure: false,
-    tls: {
-        rejectUnauthorized: false
-    },
-    auth: {
-        user: "apikey",
-        pass: process.env.SENDGRID_API_KEY //constructed api key from sendgrid
-    }
-});
-
-// Verify SMTP connection
-transporter.verify(function(error, success) {
-    if (error) {
-        console.log("SMTP connection error:", error);
-    } else {
-        console.log("SMTP server is ready to take our messages");
-    }
-});
 
 // Login endpoint
 app.post('/api/login', async (req, res) => {
@@ -147,7 +128,7 @@ app.post('/api/forgot-password', async (req, res) => {
         const user = userResult.rows[0];
         console.log('User found:', user.id);
 
-        // Generate reset token
+        // Generate timed reset token
         const token = crypto.randomBytes(32).toString('hex');
         const expires_at = new Date(Date.now() + 3600000); // 1 hour from now
         console.log('Generated token:', token);
@@ -162,32 +143,52 @@ app.post('/api/forgot-password', async (req, res) => {
         );
         console.log('Token saved successfully');
 
-        // Send reset email
-        console.log('Attempting to send email...');
-        await transporter.sendMail({
-            from: "somaan.mirza@uea.ac.uk",
-            to: email,
-            subject: 'Password Reset Request',
-            html: `
-                <div style="background-color: #f4f4f4; padding: 20px;">
-                    <div style="background-color: white; padding: 20px; border-radius: 5px; max-width: 600px; margin: 0 auto;">
-                        <h2 style="color: #333; text-align: center;">Password Reset Request</h2>
-                        <p>You have requested to reset your password.</p>
-                        <p>Click the button below to reset your password. This link will expire in 1 hour.</p>
-                        <div style="text-align: center; margin: 30px 0;">
-                            <a href="http://localhost:5173/reset-password?token=${token}" 
-                               style="background-color: #007bff; color: white; padding: 12px 24px; 
-                                      text-decoration: none; border-radius: 4px; display: inline-block;">
-                                Reset Password
-                            </a>
+        // Send reset email using SendGrid API
+        console.log('Preparing to send email via SendGrid API...');
+        try {
+            const msg = {
+                to: email,
+                from: {
+                    email: 'somaan.mirza@uea.ac.uk',
+                    name: 'Reset your password here'
+                },
+                subject: 'Social Engineering Platform',
+                html: `
+                    <div style="background-color: #f4f4f4; padding: 20px;">
+                        <div style="background-color: white; padding: 20px; border-radius: 5px; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #333; text-align: center;">Password Reset Request</h2>
+                            <p>You have requested to reset your password.</p>
+                            <p>Click the button below to reset your password.</p>
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="http://localhost:5173/reset-password?token=${token}" 
+                                   style="background-color: #007bff; color: white; padding: 12px 24px; 
+                                          text-decoration: none; border-radius: 4px; display: inline-block;">
+                                    Reset Password
+                                </a>
+                            </div>
+                            <p style="color: #666; font-size: 0.9em;">If you didn't request this password reset, please ignore this email.</p>
+                            <p style="color: #666; font-size: 0.9em;">For security, this link will expire in 1 hour.</p>
+                            <p style="color: #666; font-size: 0.9em;">Please check your spam folder if you don't see this email in your inbox.</p>
                         </div>
-                        <p style="color: #666; font-size: 0.9em;">If you didn't request this password reset, please ignore this email.</p>
-                        <p style="color: #666; font-size: 0.9em;">For security, this link will expire in 1 hour.</p>
                     </div>
-                </div>
-            `
-        });
-        console.log('Email sent successfully');
+                `
+            };
+            
+            console.log('SendGrid message configuration:', {
+                to: msg.to,
+                from: msg.from,
+                subject: msg.subject
+            });
+            
+            const response = await sgMail.send(msg);
+            console.log('Email sent successfully via SendGrid API:', response);
+        } catch (error) {
+            console.error('SendGrid API error:', error);
+            if (error.response) {
+                console.error('Error body:', error.response.body);
+            }
+            throw error;
+        }
 
         res.json({ message: 'Password reset email sent' });
 

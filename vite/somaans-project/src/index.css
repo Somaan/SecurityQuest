@@ -145,27 +145,14 @@ button:focus-visible {
 .logout-btn:hover {
   background-color: #c0392b;
 }
-/*Mobile view */
-.hamburger {
-  display: none;
-  background: none;
-  border: none;
-  color: white;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 10px 20px;
-  margin-top: 0;
-  margin-bottom: 20px;
-}
-.mobile-menu {
-  display: none;
-  flex-direction: column;
-}
 
 .sidebar-title {
   font-size: 18px;
   font-weight: bold;
   margin-bottom: 20px;
+  text-align: left;
+  padding-left: 20px;
+  padding-top: 10px;
 }
 .content-wrapper {
   margin-left: 200px;
@@ -182,7 +169,7 @@ button:focus-visible {
   width: 100%;
   max-width: 400px;
   background-color: #1a1a1a;
-  border-radius: 14px;
+  border-radius: 25px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
   margin: 0 auto;
@@ -683,13 +670,18 @@ button:focus-visible {
 
 .forgot-password-container {
   text-align: right;
-  margin-top: 0.5rem;
+  margin-top: 1.3rem;
+  margin-bottom: 0.01rem;
+  position: relative;
+  z-index: 1;
+  padding-right: 0.5rem;
 }
 
 .forgot-password-link {
   color: #646cff;
   font-size: 0.9rem;
   text-decoration: none;
+  display: inline-block;
 }
 
 .forgot-password-link:hover {

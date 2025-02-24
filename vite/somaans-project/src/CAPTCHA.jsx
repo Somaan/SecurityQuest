@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
+/** 
+- Implements a custom image-based CAPTCHA system
+- Users must select correct cells containing a bus to verify they are human
+
+*/
+
 const CAPTCHA = ({ onSuccess }) => {
   const [selectedCells, setSelectedCells] = useState(new Set());
   const [currentImageIndex, setCurrentImageIndex] = useState(0);

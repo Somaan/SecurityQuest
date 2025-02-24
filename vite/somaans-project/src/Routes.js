@@ -1,4 +1,7 @@
-// routes.js
+/**
+- Application routes configurations
+- Defines all available routes and their access levels
+ */
 export const ROUTES = {
     HOME: '/',
     LOGIN: '/login',

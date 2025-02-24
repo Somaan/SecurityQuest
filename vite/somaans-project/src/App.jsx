@@ -10,6 +10,13 @@ import { ROUTES, PUBLIC_ROUTES, PROTECTED_ROUTES } from './Routes';
 import 'react-toastify/dist/ReactToastify.css';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
+import Dashboard from './Dashboard';
+
+/** 
+- Main application component
+  - Handles routing logic and authentification state management
+  - Controls Access to protected and public routes
+*/
 
 function App() {
   const location = useLocation();
@@ -39,10 +46,10 @@ function App() {
         {/* Protected Routes */}
         <Route path={ROUTES.DASHBOARD} element={
           isAuthenticated ? (
-            <div className="content-wrapper">Dashboard Page</div>
-          ) : (
-            <Navigate to={ROUTES.LOGIN} replace />
-          )
+          <Dashboard />
+        ) : (
+          <Navigate to={ROUTES.LOGIN} replace />
+        )
         } />
         <Route path={ROUTES.QUIZ} element={
           isAuthenticated ? (
