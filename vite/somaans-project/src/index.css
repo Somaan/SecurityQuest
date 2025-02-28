@@ -711,3 +711,301 @@ button:focus-visible {
 .forgot-password-link:hover {
   text-decoration: underline;
 }
+/* 
+ * RESPONSIVE STYLES
+ * Add this to the end of your index.css file
+ */
+
+/* Tablet Styles (768px and below) */
+@media (max-width: 768px) {
+  /* Layout & Navigation */
+  .sidebar {
+    width: 160px;
+  }
+  
+  .content-wrapper {
+    margin-left: 160px;
+    width: calc(100% - 160px);
+    padding: 1rem;
+  }
+  
+  /* Dashboard & Statistics */
+  .dashboard-grid, 
+  .statistics-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .dashboard-card, 
+  .statistics-card {
+    padding: 1.25rem;
+  }
+  
+  .activity-card, 
+  .score-history-card, 
+  .streak-card {
+    grid-column: span 1;
+  }
+  
+  /* Forms */
+  .form-container, 
+  .register-form-container {
+    width: 90%;
+    max-width: 350px;
+    padding: 1.5rem;
+  }
+  
+  .form-input {
+    padding: 0.8rem;
+  }
+}
+
+/* Mobile Styles (480px and below) */
+@media (max-width: 480px) {
+  /* Mobile Menu */
+  .mobile-menu-toggle {
+    display: flex;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 999;
+    background-color: #2c3e50;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    color: white;
+    font-size: 1.25rem;
+  }
+  
+  .mobile-menu-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 900;
+  }
+  
+  .mobile-menu-overlay.show {
+    display: block;
+  }
+  
+  /* Sidebar Navigation */
+  .sidebar {
+    width: 0;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease, width 0.3s ease;
+    z-index: 950;
+  }
+  
+  .sidebar.open {
+    width: 200px;
+    transform: translateX(0);
+  }
+  
+  /* Content Layout */
+  .content-wrapper {
+    margin-left: 0;
+    width: 100%;
+    padding: 0.75rem;
+    padding-top: 60px; /* Space for mobile menu button */
+  }
+  
+  /* Dashboard & Statistics */
+  .dashboard-container, 
+  .statistics-container {
+    padding: 0.75rem;
+  }
+  
+  .dashboard-header h2,
+  .statistics-header h2 {
+    font-size: 1.25rem;
+    padding-left: 30px; /* Space for menu button */
+  }
+  
+  .progress-circle {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .progress-circle-inner {
+    width: 75px;
+    height: 75px;
+  }
+  
+  .line-chart {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Forms */
+  .form-container, 
+  .register-form-container {
+    width: 95%;
+    max-width: none;
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  
+  .login-options-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .captcha-modal {
+    width: 90%;
+    max-width: 300px;
+  }
+}
+
+/* Basic responsive structure */
+@media (max-width: 768px) {
+  .content-wrapper {
+    margin-left: 0;
+    width: 100%;
+    min-height: 100vh;
+    padding: 60px 1rem 1rem 1rem;
+  }
+  
+  /* Hide sidebar by default on mobile */
+  .sidebar {
+    position: fixed;
+    width: 0;
+    overflow: hidden;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Show sidebar when open class is added */
+  .sidebar.open {
+    width: 240px;
+    transform: translateX(0);
+  }
+  
+  /* Mobile menu toggle button */
+  .mobile-menu-toggle {
+    display: block;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: 40px;
+    height: 40px;
+    background-color: #2c3e50;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.3s;
+  }
+  
+  .mobile-menu-toggle.active {
+    background-color: #3498db;
+  }
+  
+  /* Overlay to darken background when menu is open */
+  .mobile-menu-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+  
+  .mobile-menu-overlay.show {
+    display: block;
+  }
+  
+  /* Adjust page title to not be covered by menu button */
+  .dashboard-header h2,
+  .statistics-grid h3 {
+    margin-left: 25px;
+  }
+  
+  /* Fix grid layouts for mobile */
+  .dashboard-grid,
+  .statistics-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .activity-card,
+  .score-history-card,
+  .streak-card {
+    grid-column: span 1;
+  }
+  
+  /* Fix card padding on mobile */
+  .dashboard-card,
+  .statistics-card {
+    padding: 1rem;
+  }
+}
+
+/* Extra styles for very small screens */
+@media (max-width: 480px) {
+  .content-wrapper {
+    padding: 60px 0.75rem 0.75rem 0.75rem;
+  }
+  
+  .dashboard-container,
+  .statistics-container {
+    padding: 0.5rem;
+  }
+  
+  .dashboard-header h2 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* Smaller elements for tiny screens */
+  .progress-circle {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .progress-circle-inner {
+    width: 75px;
+    height: 75px;
+  }
+  
+  .progress-percentage {
+    font-size: 1.2rem;
+  }
+  
+  /* Full width login/register containers */
+  .form-container,
+  .register-form-container {
+    width: 95%;
+    max-width: none;
+    padding: 1rem;
+    border-radius: 10px;
+  }
+  
+  /* Fix form layouts */
+  .login-options-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .forgot-password-container {
+    text-align: left;
+    margin-top: 0;
+  }
+}

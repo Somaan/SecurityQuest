@@ -1,16 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMedal } from '@fortawesome/free-solid-svg-icons';
 
 const Statistics = () => {
-  // Get username from session storage (same as Dashboard.jsx)
+  // Get username from session
   const username = sessionStorage.getItem('username') || 'User';
-
-  // Placeholder data for the line chart (would come from API/backend in a real app)
-  const scoreData = [65, 75, 70, 85, 80, 90];
   
-  // Create points for the line chart
-  const chartWidth = 500;
+  // Track window width for responsive chart
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  // Determine chart width based on screen size
+  const getChartWidth = () => {
+    if (windowWidth <= 480) return 280;
+    if (windowWidth <= 768) return 400;
+    return 500;
+  };
+
+  // Placeholder data for line chart
+  const scoreData = [65, 75, 36, 52, 74, 90];
+
+  // Creating points for chart
+  const chartWidth = getChartWidth();
   const chartHeight = 100;
   const xStep = chartWidth / (scoreData.length - 1);
   const maxScore = 100;
@@ -33,11 +54,11 @@ const Statistics = () => {
             <h3>Score History</h3>
             <div className="chart-container">
               <svg width={chartWidth} height={chartHeight} className="line-chart">
-                {/* Grid lines */}
-                <line x1="0" y1="0" x2={chartWidth} y2="0" stroke="#444" strokeDasharray="2" />
+                {/* Grid Lines */}
+                <line x1="0" y1="0" x2={chartWidth} y2="0" stroke="#444" strokeDasharray="2"/>
                 <line x1="0" y1={chartHeight/2} x2={chartWidth} y2={chartHeight/2} stroke="#444" strokeDasharray="2" />
                 <line x1="0" y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke="#444" strokeDasharray="2" />
-                
+
                 {/* Line chart */}
                 <polyline
                   fill="none"
@@ -45,18 +66,18 @@ const Statistics = () => {
                   strokeWidth="2"
                   points={points}
                 />
-                
+
                 {/* Points for each data point */}
                 {scoreData.map((score, index) => {
                   const x = index * xStep;
                   const y = chartHeight - (score / maxScore) * chartHeight;
                   return (
-                    <circle 
-                      key={index} 
-                      cx={x} 
-                      cy={y} 
-                      r="3" 
-                      fill="#646cff" 
+                    <circle
+                      key={index}
+                      cx={x}
+                      cy={y}
+                      r="3"
+                      fill="#646cff"
                     />
                   );
                 })}
@@ -64,13 +85,13 @@ const Statistics = () => {
             </div>
           </div>
 
-          {/* Module Progress Card */}
+          {/* Module Progress */}
           <div className="statistics-card module-progress-card">
             <h3>Module Progress</h3>
             <div className="module-progress-item">
               <p>Beginner - 100%</p>
               <div className="progress-bar">
-                <div className="progress-fill" style={{ width: '100%' }}></div>
+                <div className="progress-fill" style={{width: '100%' }}></div>
               </div>
             </div>
           </div>
@@ -79,7 +100,7 @@ const Statistics = () => {
           <div className="statistics-card accuracy-card">
             <h3>Accuracy</h3>
             <div className="accuracy-circle">
-              <div className="progress-circle">
+              <div className="progress-circle" style={{background: `conic-gradient(#646cff ${30 * 3.6}deg, #333 0)`}}>
                 <div className="progress-circle-inner">
                   <span className="progress-percentage">30%</span>
                 </div>
@@ -87,13 +108,13 @@ const Statistics = () => {
             </div>
           </div>
 
-          {/* Current Streak Card */}
+          {/* Current Streak */}
           <div className="statistics-card streak-card">
             <h3>Current Streak</h3>
             <div className="streak-content">
               <p>
                 5 Days - <span className="streak-badge">"Dedicated Learner"</span>
-                <FontAwesomeIcon icon={faMedal} style={{ color: '#FFD700', marginLeft: '6px' }} />
+                <FontAwesomeIcon icon={faMedal} style={{ color: '#FFD700', marginLeft: '6px'}} />
               </p>
             </div>
           </div>
@@ -154,7 +175,6 @@ const Statistics = () => {
           border-radius: 8px;
           padding: 10px;
           width: 100%;
-          max-width: 700px;
         }
         
         .module-progress-item p {
@@ -185,7 +205,7 @@ const Statistics = () => {
           display: flex;
           justify-content: center;
           align-items: center;
-          padding: 0.5rem;
+          padding: 1rem;
         }
         
         .streak-content p {
@@ -201,15 +221,12 @@ const Statistics = () => {
         .accuracy-circle {
           display: flex;
           justify-content: center;
-          align-items: center;
-          padding: 1rem;
         }
         
         .progress-circle {
-          width: 120px;
-          height: 120px;
+          width: 150px;
+          height: 150px;
           position: relative;
-          background: conic-gradient(#646cff 108deg, #333 0);
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -217,8 +234,8 @@ const Statistics = () => {
         }
 
         .progress-circle-inner {
-          width: 90px;
-          height: 90px;
+          width: 120px;
+          height: 120px;
           background: #1a1a1a;
           border-radius: 50%;
           display: flex;
@@ -230,21 +247,6 @@ const Statistics = () => {
           color: #ffffff;
           font-size: 1.5rem;
           font-weight: bold;
-        }
-        
-        @media (max-width: 768px) {
-          .statistics-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .score-history-card,
-          .streak-card {
-            grid-column: span 1;
-          }
-          
-          .dashboard-container {
-            padding: 1rem;
-          }
         }
       `}</style>
     </div>

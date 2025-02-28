@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { ROUTES } from './Routes';
@@ -9,19 +9,46 @@ import {
     faTrophy, 
     faRankingStar, 
     faChartLine, 
-    faLock 
+    faLock,
+    faBars,
+    faXmark
 } from '@fortawesome/free-solid-svg-icons';
 
-/**
-- Navigation bar components - provides main navigation for authenticated users
-- Features:
-    - Dynamic routing links
-    - Active route highlighting
-    - Logout functionality with confirmation
-    - Preserve remember me on logout (standard website behavior)
- */
-
 const Navbar = () => {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    
+    // Close sidebar when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            // If clicked outside sidebar and sidebar is open, close it
+            if (mobileMenuOpen && 
+                !event.target.closest('.sidebar') && 
+                !event.target.closest('.mobile-menu-toggle')) {
+                setMobileMenuOpen(false);
+            }
+        };
+        
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, [mobileMenuOpen]);
+
+    // Close sidebar when window is resized to larger size
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth > 768 && mobileMenuOpen) {
+                setMobileMenuOpen(false);
+            }
+        };
+        
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [mobileMenuOpen]);
+
     const handleLogout = () => {
         toast.warn(
             <div className="custom-toast">
@@ -78,53 +105,57 @@ const Navbar = () => {
             }
         });
     };
+    
+    // Close menu when a link is clicked (mobile only)
+    const closeMenu = () => {
+        setMobileMenuOpen(false);
+    };
 
     return (
-        <nav className="sidebar">
-            <div className="nav-brand">
-                Social Engineering
-            </div>
-
-            <div className="nav-links-box">
-                <NavLink to={ROUTES.DASHBOARD}>
-                    <FontAwesomeIcon icon={faHouse} className="nav-icon" /> Dashboard
-                </NavLink>
-                <NavLink to={ROUTES.QUIZ}>
-                    <FontAwesomeIcon icon={faQuestionCircle} className="nav-icon" /> Quiz
-                </NavLink>
-                <NavLink to={ROUTES.ACHIEVEMENTS}>
-                    <FontAwesomeIcon icon={faTrophy} className="nav-icon" /> Achievements
-                </NavLink>
-                <NavLink to={ROUTES.LEADERBOARD}>
-                    <FontAwesomeIcon icon={faRankingStar} className="nav-icon" /> Leaderboard
-                </NavLink>
-                <NavLink to={ROUTES.STATISTICS}>
-                    <FontAwesomeIcon icon={faChartLine} className="nav-icon" /> Statistics
-                </NavLink>
+        <>
+            {/* Mobile menu toggle button */}
+            <div 
+                className={`mobile-menu-toggle ${mobileMenuOpen ? 'active' : ''}`} 
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle navigation menu"
+            >
+                <FontAwesomeIcon icon={mobileMenuOpen ? faXmark : faBars} />
             </div>
             
-            <button className="logout-btn" onClick={handleLogout}>
-                <FontAwesomeIcon icon={faLock} className="nav-icon" /> Logout
-            </button>
+            {/* Background overlay for mobile */}
+            <div 
+                className={`mobile-menu-overlay ${mobileMenuOpen ? 'show' : ''}`} 
+                onClick={() => setMobileMenuOpen(false)}
+            ></div>
+            
+            <nav className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
+                <div className="nav-brand">
+                    Social Engineering
+                </div>
 
-            <style jsx>{`
-                .nav-icon {
-                    margin-right: 10px;
-                    width: 18px;
-                }
+                <div className="nav-links-box">
+                    <NavLink to={ROUTES.DASHBOARD} onClick={closeMenu}>
+                        <FontAwesomeIcon icon={faHouse} className="nav-icon" /> Dashboard
+                    </NavLink>
+                    <NavLink to={ROUTES.QUIZ} onClick={closeMenu}>
+                        <FontAwesomeIcon icon={faQuestionCircle} className="nav-icon" /> Quiz
+                    </NavLink>
+                    <NavLink to={ROUTES.ACHIEVEMENTS} onClick={closeMenu}>
+                        <FontAwesomeIcon icon={faTrophy} className="nav-icon" /> Achievements
+                    </NavLink>
+                    <NavLink to={ROUTES.LEADERBOARD} onClick={closeMenu}>
+                        <FontAwesomeIcon icon={faRankingStar} className="nav-icon" /> Leaderboard
+                    </NavLink>
+                    <NavLink to={ROUTES.STATISTICS} onClick={closeMenu}>
+                        <FontAwesomeIcon icon={faChartLine} className="nav-icon" /> Statistics
+                    </NavLink>
+                </div>
                 
-                .nav-links-box a {
-                    display: flex;
-                    align-items: center;
-                }
-                
-                .logout-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-            `}</style>
-        </nav>
+                <button className="logout-btn" onClick={handleLogout}>
+                    <FontAwesomeIcon icon={faLock} className="nav-icon" /> Logout
+                </button>
+            </nav>
+        </>
     );
 };
 
