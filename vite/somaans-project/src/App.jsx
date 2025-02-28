@@ -11,6 +11,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import Dashboard from './Dashboard';
+import Statistics from './Statistics';
 
 /** 
 - Main application component
@@ -111,7 +112,7 @@ function App() {
         } />
         <Route path={ROUTES.STATISTICS} element={
           isAuthenticated ? (
-            <div className="content-wrapper">Statistics Page</div>
+            <Statistics />
           ) : (
             <Navigate to={ROUTES.LOGIN} replace />
           )
