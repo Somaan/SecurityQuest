@@ -6,13 +6,15 @@ import CAPTCHA from './CAPTCHA';
 import 'react-toastify/dist/ReactToastify.css';
 import { ROUTES } from './Routes';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRightToBracket } from '@fortawesome/free-solid-svg-icons';
+import { faRightToBracket, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 
 const Register = () => {
   const navigate = useNavigate();
   const [showCaptcha, setShowCaptcha] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -236,7 +238,7 @@ const Register = () => {
                   </label>
                   <div className="input-wrapper">
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       id="password"
                       name="password"
                       placeholder="Create a password"
@@ -247,6 +249,17 @@ const Register = () => {
                       onBlur={() => setShowPasswordRequirements(false)}
                       required
                     />
+                    <button 
+                      type="button" 
+                      className="toggle-password-btn" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      <FontAwesomeIcon 
+                        icon={showPassword ? faEye : faEyeSlash} 
+                        style={{ color: "#ffffff" }}
+                      />
+                    </button>
                     <span className="char-count">
                       {formData.password.length}/{MAX_LENGTH}
                     </span>
@@ -274,7 +287,7 @@ const Register = () => {
                   </label>
                   <div className="input-wrapper">
                     <input
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       id="confirmPassword"
                       name="confirmPassword"
                       placeholder="Confirm your password"
@@ -283,6 +296,17 @@ const Register = () => {
                       onChange={handleInputChange}
                       required
                     />
+                    <button 
+                      type="button" 
+                      className="toggle-password-btn" 
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      <FontAwesomeIcon 
+                        icon={showConfirmPassword ? faEye : faEyeSlash} 
+                        style={{ color: "#ffffff" }}
+                      />
+                    </button>
                     <span className="char-count">
                       {formData.confirmPassword.length}/{MAX_LENGTH}
                     </span>
@@ -376,6 +400,37 @@ const Register = () => {
                     
                     .requirements-not-met {
                       color: #ff4444;
+                    }
+                    
+                    .toggle-password-btn {
+                      position: absolute;
+                      right: 4.5px;
+                      top: 50%;
+                      transform: translateY(-50%);
+                      background: none;
+                      border: none;
+                      cursor: pointer;
+                      padding: 6px;
+                      font-size: 20px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      z-index: 10;
+                    }
+
+                    /* Adjust input field to avoid text overlapping with the icon */
+                    .form-input {
+                      padding-right: 40px;
+                    }
+                    
+                    /* Move character count to avoid overlap */
+                    .char-count {
+                      position: absolute;
+                      right: 45px;
+                      top: 50%;
+                      transform: translateY(-50%);
+                      font-size: 0.9rem;
+                      color: #666;
                     }
                   `}
                 </style>

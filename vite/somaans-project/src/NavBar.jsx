@@ -1,12 +1,5 @@
-/**
-- Navigation bar components - provides main navigation for authenticated users
-- Features:
-    - Dynamic routing links
-    - Active route highlighting
-    - Logout functionality with confirmation
- */
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { ROUTES } from './Routes';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -19,9 +12,16 @@ import {
     faLock 
 } from '@fortawesome/free-solid-svg-icons';
 
-const Navbar = () => {
-    const navigate = useNavigate();
+/**
+- Navigation bar components - provides main navigation for authenticated users
+- Features:
+    - Dynamic routing links
+    - Active route highlighting
+    - Logout functionality with confirmation
+    - Preserve remember me on logout (standard website behavior)
+ */
 
+const Navbar = () => {
     const handleLogout = () => {
         toast.warn(
             <div className="custom-toast">
@@ -58,15 +58,24 @@ const Navbar = () => {
     };
 
     const confirmLogout = () => {
+        // Set a flag to prevent auto-login right after logout
+        sessionStorage.setItem('just_logged_out', 'true');
+        
+        // Clear authentication status
         sessionStorage.removeItem('isAuthenticated');
+        sessionStorage.removeItem('username');
+        
         toast.success('Logging you out...', {
             position: "top-center",
-            autoClose: 2000,
+            autoClose: 1500,
             hideProgressBar: false,
             closeOnClick: true,
             pauseOnHover: true,
             theme: "dark",
-            onClose: () => navigate(ROUTES.LOGIN)
+            onClose: () => {
+                // Force a hard redirect to the login page
+                window.location.href = ROUTES.LOGIN;
+            }
         });
     };
 

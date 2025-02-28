@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-#env variables
+#env variables - .env should never be committed and this is ensuring that
 .env
 .env.local
 .env.development

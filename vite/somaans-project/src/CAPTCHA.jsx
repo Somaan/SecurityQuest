@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
 
 /** 
 - Implements a custom image-based CAPTCHA system
 - Users must select correct cells containing a bus to verify they are human
-
 */
 
 const CAPTCHA = ({ onSuccess }) => {
   const [selectedCells, setSelectedCells] = useState(new Set());
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const navigate = useNavigate();
 
   // Available bus images
   const busImages = [
@@ -42,29 +39,6 @@ const CAPTCHA = ({ onSuccess }) => {
     getRandomImage();
   }, []);
 
-  // Prevent navigation across unidentified pages
-  useEffect(() => {
-    const preventNavigation = (e) => {
-      e.preventDefault();
-      e.returnValue = '';
-      return '';
-    };
-
-    const preventBackButton = (e) => {
-      e.preventDefault();
-      window.history.pushState(null, null, window.location.pathname);
-    };
-
-    window.addEventListener('beforeunload', preventNavigation);
-    window.addEventListener('popstate', preventBackButton);
-    window.history.pushState(null, null, window.location.pathname);
-
-    return () => {
-      window.removeEventListener('beforeunload', preventNavigation);
-      window.removeEventListener('popstate', preventBackButton);
-    };
-  }, []);
-
   const handleVerify = (e) => {
     e.preventDefault();
     
@@ -73,7 +47,7 @@ const CAPTCHA = ({ onSuccess }) => {
       [...selectedCells].every(cell => currentCorrectCells.has(cell));
     
     if (isCorrect) {
-      onSuccess(); 
+      onSuccess();
     } else {
       toast.error("Incorrect selection. Please try again.", {
         position: "top-center",

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from "react-toastify";
 import { ROUTES } from './Routes';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 
 const ResetPassword = () => {
     const [password, setPassword] = useState('');
@@ -9,6 +11,8 @@ const ResetPassword = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [token, setToken] = useState('');
     const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -107,7 +111,7 @@ const ResetPassword = () => {
                             </label>
                             <div className="input-wrapper">
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     id="password"
                                     value={password}
                                     onChange={(e) => {
@@ -120,6 +124,17 @@ const ResetPassword = () => {
                                     className="form-input"
                                     required
                                 />
+                                <button 
+                                    type="button" 
+                                    className="toggle-password-btn" 
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    <FontAwesomeIcon 
+                                        icon={showPassword ? faEye : faEyeSlash} 
+                                        style={{ color: "#ffffff" }}
+                                    />
+                                </button>
                                 {showPasswordRequirements && (
                                     <div className="password-requirements-dropdown">
                                         <ul>
@@ -144,7 +159,7 @@ const ResetPassword = () => {
                             </label>
                             <div className="input-wrapper">
                                 <input
-                                    type="password"
+                                    type={showConfirmPassword ? "text" : "password"}
                                     id="confirmPassword"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -152,6 +167,17 @@ const ResetPassword = () => {
                                     className="form-input"
                                     required
                                 />
+                                <button 
+                                    type="button" 
+                                    className="toggle-password-btn" 
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                >
+                                    <FontAwesomeIcon 
+                                        icon={showConfirmPassword ? faEye : faEyeSlash} 
+                                        style={{ color: "#ffffff" }}
+                                    />
+                                </button>
                             </div>
                         </div>
 
@@ -209,6 +235,27 @@ const ResetPassword = () => {
                 
                 .input-wrapper {
                     position: relative;
+                }
+                
+                .toggle-password-btn {
+                    position: absolute;
+                    right: 4.5px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    padding: 6px;
+                    font-size: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10;
+                }
+
+                /* Adjust input field to avoid text overlapping with the icon */
+                .form-input {
+                    padding-right: 40px;
                 }
             `}</style>
         </>
