@@ -108,14 +108,11 @@ const Statistics = () => {
             </div>
           </div>
 
-          {/* Current Streak */}
+          {/* Current Streak - Updated to match Dashboard style */}
           <div className="statistics-card streak-card">
             <h3>Current Streak</h3>
-            <div className="streak-content">
-              <p>
-                5 Days - <span className="streak-badge">"Dedicated Learner"</span>
-                <FontAwesomeIcon icon={faMedal} style={{ color: '#FFD700', marginLeft: '6px'}} />
-              </p>
+            <div className="activity-list">
+              <p>5 Days - Dedicated Learner<FontAwesomeIcon icon={faMedal} style={{ color: '#FFD700', marginLeft: '6px'}} /></p>
             </div>
           </div>
         </div>
@@ -201,21 +198,17 @@ const Statistics = () => {
           grid-column: span 2;
         }
         
-        .streak-content {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 1rem;
-        }
-        
-        .streak-content p {
-          font-size: 1.2rem;
+        /* Changed to match Dashboard style */
+        .activity-list {
           color: #e0e0e0;
         }
         
-        .streak-badge {
-          color: #FFD700;
-          font-weight: bold;
+        .activity-list p {
+          color: #e0e0e0;
+          margin: 0.5rem 0;
+          padding: 0.5rem;
+          border-radius: 4px;
+          background-color: #242424;
         }
         
         .accuracy-circle {
@@ -247,6 +240,38 @@ const Statistics = () => {
           color: #ffffff;
           font-size: 1.5rem;
           font-weight: bold;
+        }
+        
+        @media (max-width: 768px) {
+          .statistics-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+          }
+          
+          .score-history-card, 
+          .streak-card {
+            grid-column: span 1;
+          }
+          
+          .dashboard-container {
+            padding: 1rem;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .progress-circle {
+            width: 100px;
+            height: 100px;
+          }
+          
+          .progress-circle-inner {
+            width: 75px;
+            height: 75px;
+          }
+          
+          .progress-percentage {
+            font-size: 1.2rem;
+          }
         }
       `}</style>
     </div>

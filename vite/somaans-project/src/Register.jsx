@@ -402,22 +402,6 @@ const Register = () => {
                       color: #ff4444;
                     }
                     
-                    .toggle-password-btn {
-                      position: absolute;
-                      right: 4.5px;
-                      top: 50%;
-                      transform: translateY(-50%);
-                      background: none;
-                      border: none;
-                      cursor: pointer;
-                      padding: 6px;
-                      font-size: 20px;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      z-index: 10;
-                    }
-
                     /* Adjust input field to avoid text overlapping with the icon */
                     .form-input {
                       padding-right: 40px;

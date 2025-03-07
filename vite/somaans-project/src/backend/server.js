@@ -410,3 +410,183 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+// Get Users for Leaderboard
+app.get('/api/users', async (req, res) => {
+    try {
+        // Get all users with streak data
+        const result = await pool.query(`
+            SELECT 
+                u.id, 
+                u.username, 
+                u.created_at, 
+                u.last_login,
+                u.login_streak,
+                u.longest_login_streak,
+                u.last_login_update,
+                u.quiz_streak,
+                u.longest_quiz_streak,
+                u.last_quiz_update,
+                (
+                    SELECT COUNT(*) 
+                    FROM user_logins 
+                    WHERE user_id = u.id
+                ) AS login_days_count,
+                (
+                    SELECT COUNT(*) 
+                    FROM quiz_completions 
+                    WHERE user_id = u.id
+                ) AS quiz_days_count
+            FROM users u
+            ORDER BY 
+                (COALESCE(u.login_streak, 0) + COALESCE(u.quiz_streak, 0)) DESC, 
+                u.username ASC
+        `);
+        
+        res.json({ 
+            success: true, 
+            users: result.rows 
+        });
+    } catch (error) {
+        console.error('Error fetching users with streak data:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// API endpoint to get login history
+app.get('/api/users/login-history', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                user_id,
+                json_agg(login_date ORDER BY login_date DESC) AS login_dates
+            FROM user_logins
+            GROUP BY user_id
+        `);
+        
+        res.json({
+            success: true,
+            loginHistory: result.rows
+        });
+    } catch (error) {
+        console.error('Error fetching login history:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// API endpoint to get quiz completion history
+app.get('/api/users/quiz-history', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                user_id,
+                json_agg(
+                    json_build_object(
+                        'date', completion_date,
+                        'quiz_id', quiz_id,
+                        'score', score
+                    ) ORDER BY completion_date DESC
+                ) AS quiz_completions
+            FROM quiz_completions
+            GROUP BY user_id
+        `);
+        
+        res.json({
+            success: true,
+            quizHistory: result.rows
+        });
+    } catch (error) {
+        console.error('Error fetching quiz history:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// API endpoint to get detailed streak info for a specific user
+app.get('/api/users/:userId/streaks', async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+        // Get user streak data
+        const userResult = await pool.query(`
+            SELECT 
+                id, 
+                username,
+                last_login, 
+                login_streak,
+                longest_login_streak,
+                last_login_update,
+                quiz_streak,
+                longest_quiz_streak,
+                last_quiz_update
+            FROM users
+            WHERE id = $1
+        `, [userId]);
+        
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Get login history for streak visualization
+        const loginHistoryResult = await pool.query(`
+            SELECT login_date
+            FROM user_logins
+            WHERE user_id = $1
+            ORDER BY login_date DESC
+            LIMIT 30
+        `, [userId]);
+        
+        // Get quiz completion history
+        const quizHistoryResult = await pool.query(`
+            SELECT completion_date, quiz_id, score
+            FROM quiz_completions
+            WHERE user_id = $1
+            ORDER BY completion_date DESC
+            LIMIT 30
+        `, [userId]);
+        
+        res.json({
+            success: true,
+            userData: userResult.rows[0],
+            loginHistory: loginHistoryResult.rows.map(row => row.login_date),
+            quizHistory: quizHistoryResult.rows
+        });
+    } catch (error) {
+        console.error(`Error fetching streak data for user ${userId}:`, error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Endpoint to record a quiz completion (call this when a user completes a quiz)
+app.post('/api/quiz/complete', async (req, res) => {
+    const { userId, quizId, score } = req.body;
+    
+    try {
+        // Validate userId
+        const userExists = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+        if (userExists.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        // Record quiz completion
+        const result = await pool.query(`
+            INSERT INTO quiz_completions (user_id, quiz_id, score)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, completion_date) 
+            DO UPDATE SET
+                quiz_id = EXCLUDED.quiz_id,
+                score = EXCLUDED.score
+            RETURNING id
+        `, [userId, quizId, score]);
+        
+        // The update_quiz_streak trigger will automatically update the user's quiz streak
+        
+        res.json({
+            success: true,
+            message: 'Quiz completion recorded successfully',
+            completionId: result.rows[0].id
+        });
+    } catch (error) {
+        console.error('Error recording quiz completion:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});

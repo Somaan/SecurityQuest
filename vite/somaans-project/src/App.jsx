@@ -12,6 +12,7 @@ import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import Dashboard from './Dashboard';
 import Statistics from './Statistics';
+import Leaderboard from './Leaderboard';
 
 /** 
 - Main application component
@@ -105,7 +106,7 @@ function App() {
         } />
         <Route path={ROUTES.LEADERBOARD} element={
           isAuthenticated ? (
-            <div className="content-wrapper">Leaderboard Page</div>
+            <Leaderboard />
           ) : (
             <Navigate to={ROUTES.LOGIN} replace />
           )
