@@ -590,3 +590,105 @@ app.post('/api/quiz/complete', async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+
+// API endpoint to get user achievements
+app.get('/api/users/:userId/achievements', async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+      // Check if user exists
+      const userResult = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Here you'd typically query your achievements table
+      // Since we don't have that yet, let's generate some achievements based on user stats
+      
+      // Get user stats
+      const userStats = await pool.query(`
+        SELECT 
+          u.login_streak,
+          u.longest_login_streak,
+          u.quiz_streak,
+          u.longest_quiz_streak,
+          (SELECT COUNT(*) FROM quiz_completions WHERE user_id = u.id) AS total_quizzes,
+          (SELECT COUNT(*) FROM user_logins WHERE user_id = u.id) AS total_logins
+        FROM users u
+        WHERE u.id = $1
+      `, [userId]);
+      
+      const stats = userStats.rows[0];
+      
+      // Generate achievements based on stats
+      const achievements = [
+        {
+          id: 1,
+          title: 'Quick Learner',
+          description: '3 correct in a row',
+          icon: 'star',
+          color: '#c0a43c', // gold
+          unlocked: stats.total_quizzes >= 3,
+          progress: Math.min(100, (stats.total_quizzes / 3) * 100)
+        },
+        {
+          id: 2,
+          title: 'Rising Star',
+          description: '3 correct in a row',
+          icon: 'star',
+          color: '#a9a9a9', // silver
+          unlocked: stats.total_quizzes >= 5,
+          progress: Math.min(100, (stats.total_quizzes / 5) * 100)
+        },
+        {
+          id: 3,
+          title: 'Security Champion',
+          description: '#1 on leaderboard',
+          icon: 'shield',
+          color: '#b87333', // bronze
+          unlocked: false, // You'd need to check leaderboard ranking
+          progress: 25 // Placeholder
+        },
+        {
+          id: 4,
+          title: 'Dedicated Learner',
+          description: '5 day login streak',
+          icon: 'calendar-check',
+          color: '#a9a9a9', // silver
+          unlocked: stats.login_streak >= 5 || stats.longest_login_streak >= 5,
+          progress: Math.min(100, (stats.login_streak / 5) * 100)
+        },
+        {
+          id: 5,
+          title: 'Quiz Master',
+          description: 'Complete 10 quizzes',
+          icon: 'trophy',
+          color: '#c0a43c', // gold
+          unlocked: stats.total_quizzes >= 10,
+          progress: Math.min(100, (stats.total_quizzes / 10) * 100)
+        },
+        {
+          id: 6,
+          title: 'Regular User',
+          description: 'Login 10 days in total',
+          icon: 'medal',
+          color: '#b87333', // bronze
+          unlocked: stats.total_logins >= 10,
+          progress: Math.min(100, (stats.total_logins / 10) * 100)
+        }
+      ];
+      
+      res.json({
+        success: true,
+        achievements: achievements
+      });
+      
+    } catch (error) {
+      console.error(`Error fetching achievements for user ${userId}:`, error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+  
+  // Update constants.js to include the new endpoint:
+  // GET_USER_ACHIEVEMENTS: 'http://localhost:5000/api/users/:userId/achievements',

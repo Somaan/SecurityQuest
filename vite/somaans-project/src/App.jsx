@@ -13,6 +13,7 @@ import ResetPassword from './ResetPassword';
 import Dashboard from './Dashboard';
 import Statistics from './Statistics';
 import Leaderboard from './Leaderboard';
+import Achievements from './Achievements';
 
 /** 
 - Main application component
@@ -99,7 +100,7 @@ function App() {
         } />
         <Route path={ROUTES.ACHIEVEMENTS} element={
           isAuthenticated ? (
-            <div className="content-wrapper">Achievements Page</div>
+            <Achievements />
           ) : (
             <Navigate to={ROUTES.LOGIN} replace />
           )

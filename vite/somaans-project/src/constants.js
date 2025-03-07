@@ -9,12 +9,12 @@ export const API_ENDPOINTS = {
     FORGOT_PASSWORD: 'http://localhost:5000/api/forgot-password',
     RESET_PASSWORD: 'http://localhost:5000/api/reset-password',
     INVALIDATE_REMEMBER_TOKEN: 'http://localhost:5000/api/invalidate-remember-token',
-    // Add new endpoint for getting users from your database
     GET_USERS: 'http://localhost:5000/api/users',
     GET_USER_LOGIN_HISTORY: 'http://localhost:5000/api/users/login-history',
     GET_USER_QUIZ_HISTORY: 'http://localhost:5000/api/users/quiz-history',
     GET_USER_STREAKS: 'http://localhost:5000/api/users/:userId/streaks',
-    COMPLETE_QUIZ: 'http://localhost:5000/api/quiz/complete'
+    COMPLETE_QUIZ: 'http://localhost:5000/api/quiz/complete',
+    GET_USER_ACHIEVEMENTS: 'http://localhost:5000/api/users/:userId/achievements'
   };
   
   // CAPTCHA configuration
