@@ -17,7 +17,8 @@ import {
     faExclamationTriangle,
     faFire,
     faBook,
-    faSignIn
+    faSignIn,
+    faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
 import { API_ENDPOINTS } from './constants';
 import { toast } from "react-toastify";
@@ -40,6 +41,18 @@ const Leaderboard = () => {
     useEffect(() => {
         fetchUsers();
     }, [timeFilter, viewFilter, streakFilter]);
+    
+    // Get day difference between now and a date
+    const getDayDifference = (date) => {
+        if (!date) return Infinity;
+        
+        const now = new Date();
+        const targetDate = new Date(date);
+        
+        // Calculate difference in days
+        const diffTime = Math.abs(now - targetDate);
+        return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    };
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -52,12 +65,24 @@ const Leaderboard = () => {
 
             const data = await response.json();
 
-            // Process users with actual streak data
+            // Process users with actual streak data and apply frontend streak validation
             const processedUsers = data.users.map(user => {
-                // Calculate combined streak
-                const loginStreak = user.login_streak || 0;
-                const quizStreak = user.quiz_streak || 0;
-                const combinedStreak = loginStreak + quizStreak;
+                // Validate login streak - if more than 1 day has passed since last login, reset to 0
+                const loginDayDifference = getDayDifference(user.last_login);
+                const validatedLoginStreak = loginDayDifference > 1 ? 0 : (user.login_streak || 0);
+                
+                // Validate quiz streak - if more than 1 day has passed since last quiz update, reset to 0
+                const quizDayDifference = getDayDifference(user.last_quiz_update);
+                const validatedQuizStreak = quizDayDifference > 1 ? 0 : (user.quiz_streak || 0);
+                
+                // Calculate combined streak using the validated individual streaks
+                const combinedStreak = validatedLoginStreak + validatedQuizStreak;
+                
+                // Debug logging for streak validation
+                if (user.login_streak !== validatedLoginStreak || user.quiz_streak !== validatedQuizStreak) {
+                    console.log(`User ${user.username}: Login streak: ${user.login_streak} → ${validatedLoginStreak} (${loginDayDifference} days since last login)`);
+                    console.log(`User ${user.username}: Quiz streak: ${user.quiz_streak} → ${validatedQuizStreak} (${quizDayDifference} days since last quiz)`);
+                }
                 
                 return {
                     id: user.id,
@@ -65,23 +90,31 @@ const Leaderboard = () => {
                     score: Math.floor(Math.random() * 1000) + 5000, // Keep random for now
                     accuracy: Math.floor(Math.random() * 30) + 70, // Keep random for now
                     completedChallenges: user.quiz_days_count || Math.floor(Math.random() * 20) + 5,
-                    // All streak types
-                    loginStreak: loginStreak,
-                    quizStreak: quizStreak,
+                    // All streak types - using validated values
+                    loginStreak: validatedLoginStreak,
+                    quizStreak: validatedQuizStreak,
                     combinedStreak: combinedStreak,
+                    // Original values for reference
+                    originalLoginStreak: user.login_streak || 0,
+                    originalQuizStreak: user.quiz_streak || 0,
                     // Longest streaks
                     longestLoginStreak: user.longest_login_streak || 0,
                     longestQuizStreak: user.longest_quiz_streak || 0,
                     // Use the active streak type based on filter
                     streak: streakFilter === 'login' 
-                        ? loginStreak 
+                        ? validatedLoginStreak 
                         : streakFilter === 'quiz' 
-                            ? quizStreak 
+                            ? validatedQuizStreak 
                             : combinedStreak,
                     change: ['up', 'down', 'same'][Math.floor(Math.random() * 3)], // Keep random for now
                     lastLogin: user.last_login,
                     lastLoginUpdate: user.last_login_update,
-                    lastQuizUpdate: user.last_quiz_update
+                    lastQuizUpdate: user.last_quiz_update,
+                    // Track if streaks were reset for this user
+                    streakReset: {
+                        login: user.login_streak > 0 && validatedLoginStreak === 0,
+                        quiz: user.quiz_streak > 0 && validatedQuizStreak === 0
+                    }
                 };
             });
 
@@ -96,6 +129,41 @@ const Leaderboard = () => {
             });
 
             setUsers(processedUsers);
+            
+            // Count users with reset streaks for better notification
+            const usersWithResetLoginStreaks = processedUsers.filter(u => u.streakReset.login).length;
+            const usersWithResetQuizStreaks = processedUsers.filter(u => u.streakReset.quiz).length;
+            
+            // Show toast notification about streak resets if needed
+            if (usersWithResetLoginStreaks > 0 || usersWithResetQuizStreaks > 0) {
+                let message = "Streak information updated:\n";
+                
+                if (usersWithResetLoginStreaks > 0) {
+                    message += `• ${usersWithResetLoginStreaks} user(s) had login streaks reset.\n`;
+                }
+                
+                if (usersWithResetQuizStreaks > 0) {
+                    message += `• ${usersWithResetQuizStreaks} user(s) had quiz streaks reset.\n`;
+                }
+                
+                message += "Streaks reset after 24 hours of inactivity.";
+                
+                toast.info(
+                    <div>
+                        <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: '8px' }} />
+                        <span style={{ whiteSpace: 'pre-line' }}>{message}</span>
+                    </div>,
+                    {
+                        position: "top-center",
+                        autoClose: 6000,
+                        hideProgressBar: false,
+                        closeOnClick: true,
+                        pauseOnHover: true,
+                        draggable: true,
+                        theme: "dark"
+                    }
+                );
+            }
         } catch (err) {
             console.error('Error fetching users', err);
             setError(err.message);
@@ -292,7 +360,7 @@ const Leaderboard = () => {
                             </button>
                         </div>
                         
-                        {/* New streak type filter */}
+                        {/* Streak type filter */}
                         <div className="filter-group streak-filter-group">
                             <button
                                 className={`filter-btn ${streakFilter === 'combined' ? 'active' : ''}`}
@@ -359,7 +427,7 @@ const Leaderboard = () => {
                                         
                                         {/* Updated streak column with type indicator */}
                                         <div 
-                                            className="streak-column tooltip-container" 
+                                            className={`streak-column tooltip-container ${user.streakReset.login || user.streakReset.quiz ? 'streak-reset' : ''}`}
                                             data-streak={
                                                 user.streak >= 30 ? "30" : 
                                                 user.streak >= 10 ? "10" : 
@@ -373,8 +441,20 @@ const Leaderboard = () => {
                                             
                                             <div className="tooltip">
                                                 <p className="tooltip-title">Streak Details</p>
-                                                <p><span className="tooltip-label">Login Streak:</span> {user.loginStreak} days</p>
-                                                <p><span className="tooltip-label">Quiz Streak:</span> {user.quizStreak} days</p>
+                                                <p>
+                                                    <span className="tooltip-label">Login Streak:</span> 
+                                                    {user.loginStreak} days
+                                                    {user.streakReset.login && 
+                                                        <span className="streak-reset-indicator"> (Reset due to inactivity)</span>
+                                                    }
+                                                </p>
+                                                <p>
+                                                    <span className="tooltip-label">Quiz Streak:</span> 
+                                                    {user.quizStreak} days
+                                                    {user.streakReset.quiz && 
+                                                        <span className="streak-reset-indicator"> (Reset due to inactivity)</span>
+                                                    }
+                                                </p>
                                                 <p><span className="tooltip-label">Combined:</span> {user.combinedStreak} days</p>
                                                 <div className="tooltip-divider"></div>
                                                 <p><span className="tooltip-label">Last Login:</span> {formatTimeAgo(user.lastLogin)}</p>
@@ -401,11 +481,21 @@ const Leaderboard = () => {
                                                     </div>
                                                     <div className="detail-item">
                                                         <span className="detail-label">Login Streak</span>
-                                                        <span className="detail-value">{user.loginStreak} days</span>
+                                                        <span className="detail-value">
+                                                            {user.loginStreak} days
+                                                            {user.streakReset.login && 
+                                                                <span className="streak-reset-indicator smaller"> (Reset)</span>
+                                                            }
+                                                        </span>
                                                     </div>
                                                     <div className="detail-item">
                                                         <span className="detail-label">Quiz Streak</span>
-                                                        <span className="detail-value">{user.quizStreak} days</span>
+                                                        <span className="detail-value">
+                                                            {user.quizStreak} days
+                                                            {user.streakReset.quiz && 
+                                                                <span className="streak-reset-indicator smaller"> (Reset)</span>
+                                                            }
+                                                        </span>
                                                     </div>
                                                     <div className="detail-item">
                                                         <span className="detail-label">Longest Login Streak</span>
@@ -453,7 +543,7 @@ const Leaderboard = () => {
                                                     
                                                     {/* Updated streak column with type indicator */}
                                                     <div 
-                                                        className="streak-column tooltip-container"
+                                                        className={`streak-column tooltip-container ${user.streakReset.login || user.streakReset.quiz ? 'streak-reset' : ''}`}
                                                         data-streak={
                                                             user.streak >= 30 ? "30" : 
                                                             user.streak >= 10 ? "10" : 
@@ -467,8 +557,20 @@ const Leaderboard = () => {
                                                         
                                                         <div className="tooltip">
                                                             <p className="tooltip-title">Streak Details</p>
-                                                            <p><span className="tooltip-label">Login Streak:</span> {user.loginStreak} days</p>
-                                                            <p><span className="tooltip-label">Quiz Streak:</span> {user.quizStreak} days</p>
+                                                            <p>
+                                                                <span className="tooltip-label">Login Streak:</span> 
+                                                                {user.loginStreak} days
+                                                                {user.streakReset.login && 
+                                                                    <span className="streak-reset-indicator"> (Reset due to inactivity)</span>
+                                                                }
+                                                            </p>
+                                                            <p>
+                                                                <span className="tooltip-label">Quiz Streak:</span> 
+                                                                {user.quizStreak} days
+                                                                {user.streakReset.quiz && 
+                                                                    <span className="streak-reset-indicator"> (Reset due to inactivity)</span>
+                                                                }
+                                                            </p>
                                                             <p><span className="tooltip-label">Combined:</span> {user.combinedStreak} days</p>
                                                             <div className="tooltip-divider"></div>
                                                             <p><span className="tooltip-label">Last Login:</span> {formatTimeAgo(user.lastLogin)}</p>
@@ -495,11 +597,21 @@ const Leaderboard = () => {
                                                                 </div>
                                                                 <div className="detail-item">
                                                                     <span className="detail-label">Login Streak</span>
-                                                                    <span className="detail-value">{user.loginStreak} days</span>
+                                                                    <span className="detail-value">
+                                                                        {user.loginStreak} days
+                                                                        {user.streakReset.login && 
+                                                                            <span className="streak-reset-indicator smaller"> (Reset)</span>
+                                                                        }
+                                                                    </span>
                                                                 </div>
                                                                 <div className="detail-item">
                                                                     <span className="detail-label">Quiz Streak</span>
-                                                                    <span className="detail-value">{user.quizStreak} days</span>
+                                                                    <span className="detail-value">
+                                                                        {user.quizStreak} days
+                                                                        {user.streakReset.quiz && 
+                                                                            <span className="streak-reset-indicator smaller"> (Reset)</span>
+                                                                        }
+                                                                    </span>
                                                                 </div>
                                                                 <div className="detail-item">
                                                                     <span className="detail-label">Longest Login Streak</span>
@@ -513,7 +625,7 @@ const Leaderboard = () => {
                                                                     <span className="detail-label">Last Active</span>
                                                                     <span className="detail-value">{formatTimeAgo(user.lastLogin)}</span>
                                                                 </div>
-                                                                </div>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -555,6 +667,18 @@ const Leaderboard = () => {
                             )}
                         </>
                     )}
+                </div>
+                
+                {/* Extra helpful information about streaks */}
+                <div className="streak-info-card">
+                    <h3><FontAwesomeIcon icon={faInfoCircle} /> Streak Information</h3>
+                    <p>Streaks are updated based on your activity:</p>
+                    <ul>
+                        <li><strong>Login Streak:</strong> Increases each day you log in, resets after 24 hours of inactivity</li>
+                        <li><strong>Quiz Streak:</strong> Increases each day you complete at least one quiz, resets after 24 hours of inactivity</li>
+                        <li><strong>Combined Streak:</strong> The sum of your login and quiz streaks</li>
+                    </ul>
+                    <p className="note">Note: If you see a "Reset" indicator, it means the streak was reset due to inactivity.</p>
                 </div>
             </div>
             
@@ -1021,6 +1145,82 @@ const Leaderboard = () => {
                 
                 .retry-btn:hover {
                     background-color: #2980b9;
+                }
+                
+                .streak-card {
+                    grid-column: span 2;
+                }
+                
+                /* New styles for streak reset indicators */
+                .streak-reset {
+                    position: relative;
+                }
+                
+                .streak-reset:after {
+                    content: "Reset";
+                    position: absolute;
+                    top: -8px;
+                    right: -8px;
+                    background-color: #e74c3c;
+                    color: white;
+                    font-size: 0.65rem;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    font-weight: bold;
+                }
+                
+                .streak-reset-indicator {
+                    color: #e74c3c;
+                    font-size: 0.85em;
+                    font-style: italic;
+                }
+                
+                .streak-reset-indicator.smaller {
+                    font-size: 0.75em;
+                }
+                
+                /* Streak Info Card */
+                .streak-info-card {
+                    background-color: #1a1a1a;
+                    border-radius: 14px;
+                    padding: 1.25rem;
+                    margin-top: 1.5rem;
+                    margin-bottom: -1rem;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+                    border-left: 3px solid #3498db;
+                }
+                
+                .streak-info-card h3 {
+                    color: #3498db;
+                    font-size: 1rem;
+                    margin-bottom: 0.75rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                
+                .streak-info-card p {
+                    margin: 0.5rem 0;
+                    color: #ecf0f1;
+                    font-size: 0.9rem;
+                }
+                
+                .streak-info-card ul {
+                    margin: 0.5rem 0;
+                    padding-left: 1.5rem;
+                }
+                
+                .streak-info-card li {
+                    margin: 0.25rem 0;
+                    color: #ecf0f1;
+                    font-size: 0.9rem;
+                }
+                
+                .streak-info-card .note {
+                    font-style: italic;
+                    color: #95a5a6;
+                    font-size: 0.85rem;
+                    margin-top: 0.75rem;
                 }
                 
                 /* Responsive design */

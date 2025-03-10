@@ -70,7 +70,7 @@ const CAPTCHA = ({ onSuccess }) => {
         <div className="captcha-header">
           <p className="captcha-title">Select all images that includes:</p>
           <p className="captcha-subtitle">A bus</p>
-          <p className="captcha-note">If there are none, click skip</p>
+          
         </div>
         <div className="captcha-image-container">
           <img 

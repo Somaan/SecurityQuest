@@ -410,7 +410,7 @@ const Register = () => {
                     /* Move character count to avoid overlap */
                     .char-count {
                       position: absolute;
-                      right: 45px;
+                      right: 30px;
                       top: 50%;
                       transform: translateY(-50%);
                       font-size: 0.9rem;
