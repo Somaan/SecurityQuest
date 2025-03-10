@@ -14,6 +14,7 @@ import Dashboard from './Dashboard';
 import Statistics from './Statistics';
 import Leaderboard from './Leaderboard';
 import Achievements from './Achievements';
+import Quiz from './Quiz';
 
 /** 
 - Main application component
@@ -91,9 +92,9 @@ function App() {
           <Navigate to={ROUTES.LOGIN} replace />
         )
         } />
-        <Route path={ROUTES.QUIZ} element={
+        <Route path={ROUTES.QUIZ + '/*'} element={
           isAuthenticated ? (
-            <div className="content-wrapper">Quiz Page</div>
+            <Quiz />
           ) : (
             <Navigate to={ROUTES.LOGIN} replace />
           )

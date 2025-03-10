@@ -8,6 +8,9 @@ export const ROUTES = {
     REGISTER: '/register',
     DASHBOARD: '/dashboard',
     QUIZ: '/quiz',
+    QUIZ_DIFFICULTY: './quiz/difficulty',
+    QUIZ_RESULTS: './quiz/results',
+    QUIZ_QUESTIONS: './quiz/questions',
     ACHIEVEMENTS: '/achievements',
     LEADERBOARD: '/leaderboard',
     STATISTICS: '/statistics',
@@ -28,6 +31,9 @@ export const PUBLIC_ROUTES = [
 export const PROTECTED_ROUTES = [
     ROUTES.DASHBOARD,
     ROUTES.QUIZ,
+    ROUTES.QUIZ_DIFFICULTY,
+    ROUTES.QUIZ_RESULTS,
+    ROUTES.QUIZ_QUESTIONS,
     ROUTES.ACHIEVEMENTS,
     ROUTES.LEADERBOARD,
     ROUTES.STATISTICS
