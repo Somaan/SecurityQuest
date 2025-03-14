@@ -27,6 +27,8 @@ const LoginForm = () => {
     password: '',
   });
 
+  const [loginData, setLoginData] = useState(null);
+
   const MAX_LENGTH = 20;
 
   // Cleanup function to remove any possible navigation blockers
@@ -105,6 +107,8 @@ const LoginForm = () => {
       if (!response.ok) {
         throw new Error(data.error || 'Login Failed');
       }
+
+      setLoginData(data);
     
       // Handle Remember Me functionality
       if (rememberMe) {
@@ -135,12 +139,11 @@ const LoginForm = () => {
     sessionStorage.setItem('isAuthenticated', 'true');
     sessionStorage.setItem('username', formData.username);
 
-    if (data && data.user && data.user.id) {
-      sessionStorage.setItem('userId', data.user.id.toString());
-      console.log('Stored userID:', data.user.id);
+    if (loginData && loginData.user && loginData.user.id) {
+      sessionStorage.setItem('userId', loginData.user.id.toString());
     } else {
-      console.warn('UserId not available in response, using default');
       sessionStorage.setItem('userId', '1');
+      console.warn("UserId, not found in login response, using default");
     }
     
     // Show success message

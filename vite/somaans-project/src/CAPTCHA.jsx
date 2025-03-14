@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { ROUTES } from './Routes';
 
 /** 
 - Implements a custom image-based CAPTCHA system
@@ -47,7 +48,26 @@ const CAPTCHA = ({ onSuccess }) => {
       [...selectedCells].every(cell => currentCorrectCells.has(cell));
     
     if (isCorrect) {
-      onSuccess();
+      // Set authentication in session storage
+      sessionStorage.setItem('isAuthenticated', 'true');
+      sessionStorage.setItem('username', sessionStorage.getItem('username') || 'User');
+      
+      // Show success toast
+      toast.success("Login successful!", {
+        position: "top-center",
+        autoClose: 1500,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: "dark"
+      });
+      
+      // Redirect to dashboard immediately
+      window.location.href = ROUTES.DASHBOARD;
+      
+      // Also call the onSuccess callback if needed
+      if (onSuccess) onSuccess();
     } else {
       toast.error("Incorrect selection. Please try again.", {
         position: "top-center",

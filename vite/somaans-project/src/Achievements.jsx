@@ -6,87 +6,71 @@ import {
   faShield, 
   faStar, 
   faCalendarCheck,
-  faExclamationTriangle
+  faExclamationTriangle,
+  faSpinner
 } from '@fortawesome/free-solid-svg-icons';
 import { API_ENDPOINTS } from './constants';
+import { toast } from 'react-toastify';
 
 const Achievements = () => {
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const username = sessionStorage.getItem('username') || 'User';
+  const userId = sessionStorage.getItem('userId') || '1';
 
   useEffect(() => {
-    // Since you may not have the backend endpoint implemented yet, we'll use mock data
     const fetchAchievements = async () => {
       setLoading(true);
       try {
-        // For future integration with real API
-        // const userId = sessionStorage.getItem('userId');
-        // const response = await fetch(API_ENDPOINTS.GET_USER_ACHIEVEMENTS.replace(':userId', userId));
-        // const data = await response.json();
-        // setAchievements(data.achievements);
+        // Call the real API endpoint
+        console.log('Fetching achievements for user:', userId);
+        const response = await fetch(API_ENDPOINTS.GET_USER_ACHIEVEMENTS.replace(':userId', userId));
         
-        // Mock data based on your mockup
-        const mockAchievements = [
-          {
-            id: 1,
-            title: 'Quick Learner',
-            description: '3 correct in a row',
-            icon: faStar,
-            color: '#c0a43c', // gold
-            unlocked: true,
-            progress: 100
-          },
-          {
-            id: 2,
-            title: 'Rising Star',
-            description: '3 correct in a row',
-            icon: faStar,
-            color: '#a9a9a9', // silver
-            unlocked: false,
-            progress: 66
-          },
-          {
-            id: 3,
-            title: 'Security Champion',
-            description: '#1 on leaderboard',
-            icon: faShield,
-            color: '#b87333', // bronze
-            unlocked: false,
-            progress: 25
-          },
-          {
-            id: 4,
-            title: 'Dedicated Learner',
-            description: '5 day login streak',
-            icon: faCalendarCheck,
-            color: '#a9a9a9', // silver
-            unlocked: true,
-            progress: 100
-          }
-        ];
+        if (!response.ok) {
+          throw new Error('Failed to load achievements');
+        }
         
-        // Simulate API delay
-        setTimeout(() => {
-          setAchievements(mockAchievements);
-          setLoading(false);
-        }, 800);
+        const data = await response.json();
+        console.log('Achievements data:', data);
+        
+        if (data.success && data.achievements) {
+          setAchievements(data.achievements);
+        } else {
+          throw new Error('Invalid achievement data format');
+        }
       } catch (err) {
         console.error('Error fetching achievements:', err);
-        setError('Failed to load achievements. Please try again later.');
+        setError(err.message);
+        toast.error('Failed to load achievements');
+      } finally {
         setLoading(false);
       }
     };
 
     fetchAchievements();
-  }, []);
+  }, [userId]);
+
+  // Helper function to get icon based on achievement title
+  const getIconForAchievement = (achievement) => {
+    if (achievement.title.includes('Star') || achievement.title.includes('Learner')) {
+      return faStar;
+    } else if (achievement.title.includes('Champion') || achievement.title.includes('Security')) {
+      return faShield;
+    } else if (achievement.title.includes('Streak') || achievement.title.includes('Login')) {
+      return faCalendarCheck;
+    } else if (achievement.title.includes('Master')) {
+      return faTrophy;
+    } else {
+      return faMedal;
+    }
+  };
 
   if (loading) {
     return (
       <div className="content-wrapper">
         <div className="loading-container">
-          <div className="loading-spinner"></div>
+          <FontAwesomeIcon icon={faSpinner} spin className="loading-spinner" />
           <p>Loading achievements...</p>
         </div>
       </div>
@@ -108,43 +92,66 @@ const Achievements = () => {
     );
   }
 
+  // Sort achievements: unlocked first, then by progress
+  const sortedAchievements = [...achievements].sort((a, b) => {
+    // First by unlocked status
+    if (a.unlocked && !b.unlocked) return -1;
+    if (!a.unlocked && b.unlocked) return 1;
+    
+    // Then by progress for locked achievements
+    if (!a.unlocked && !b.unlocked) {
+      return b.progress - a.progress;
+    }
+    
+    // Then by title
+    return a.title.localeCompare(b.title);
+  });
+
   return (
     <div className="content-wrapper">
       <div className="achievements-container">
         <div className="achievements-header">
-          <h2>Let's see what acheivements you've received, {username}</h2>
-          <h3>As you complete the quizzes, you will be able to see view your acheivements here. </h3>
+          <h2>Let's see what achievements you've received, {username}</h2>
+          <h3>As you complete quizzes, you will be able to see view your achievements here.</h3>
         </div>
         
         <div className="achievements-grid">
-          {achievements.map(achievement => (
-            <div key={achievement.id} className="achievement-card">
-              <div 
-                className={`achievement-icon ${!achievement.unlocked && 'locked'}`}
-                style={{backgroundColor: achievement.unlocked ? achievement.color : '#ccc'}}
-              >
-                <FontAwesomeIcon icon={achievement.icon} />
-              </div>
-              
-              <div className="achievement-details">
-                <h3>{achievement.title}</h3>
-                <p>{achievement.description}</p>
+          {sortedAchievements.length > 0 ? (
+            sortedAchievements.map(achievement => (
+              <div key={achievement.id} className="achievement-card">
+                <div 
+                  className={`achievement-icon ${!achievement.unlocked && 'locked'}`}
+                  style={{backgroundColor: achievement.unlocked ? achievement.color : '#ccc'}}
+                >
+                  <FontAwesomeIcon icon={getIconForAchievement(achievement)} />
+                </div>
                 
-                {achievement.unlocked ? (
-                  <div className="achievement-unlocked">Unlocked!</div>
-                ) : (
-                  <div className="achievement-progress">
-                    <div className="progress-bar">
-                      <div 
-                        className="progress-fill" 
-                        style={{width: `${achievement.progress}%`}}
-                      ></div>
+                <div className="achievement-details">
+                  <h3>{achievement.title}</h3>
+                  <p>{achievement.description}</p>
+                  
+                  {achievement.unlocked ? (
+                    <div className="achievement-unlocked">Unlocked!</div>
+                  ) : (
+                    <div className="achievement-progress">
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill" 
+                          style={{width: `${achievement.progress}%`}}
+                        ></div>
+                      </div>
+                      <span className="progress-text">{Math.round(achievement.progress)}%</span>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="no-achievements">
+              <FontAwesomeIcon icon={faTrophy} className="no-achievements-icon" />
+              <p>No achievements yet. Complete quizzes to earn achievements!</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
       
@@ -165,9 +172,16 @@ const Achievements = () => {
           font-size: 1.5rem;
         }
         
+        .achievements-header h3 {
+          color: #e0e0e0;
+          font-size: 1rem;
+          font-weight: normal;
+          margin-top: 0.5rem;
+        }
+        
         .achievements-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 1.5rem;
         }
         
@@ -179,6 +193,11 @@ const Achievements = () => {
           display: flex;
           align-items: center;
           gap: 1.5rem;
+          transition: transform 0.2s ease;
+        }
+        
+        .achievement-card:hover {
+          transform: translateY(-5px);
         }
         
         .achievement-icon {
@@ -191,6 +210,7 @@ const Achievements = () => {
           color: #ffffff;
           font-size: 1.5rem;
           flex-shrink: 0;
+          transition: all 0.2s ease;
         }
         
         .achievement-icon.locked {
@@ -217,6 +237,8 @@ const Achievements = () => {
         .achievement-unlocked {
           color: #4caf50;
           font-weight: bold;
+          display: flex;
+          align-items: center;
         }
         
         .achievement-progress {
@@ -229,6 +251,7 @@ const Achievements = () => {
           background-color: #333;
           border-radius: 5px;
           overflow: hidden;
+          margin-bottom: 5px;
         }
         
         .progress-fill {
@@ -236,6 +259,11 @@ const Achievements = () => {
           background-color: #646cff;
           border-radius: 5px;
           transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+          font-size: 0.8rem;
+          color: #bdc3c7;
         }
         
         .loading-container {
@@ -248,17 +276,9 @@ const Achievements = () => {
         }
         
         .loading-spinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid rgba(52, 152, 219, 0.3);
-          border-top-color: #3498db;
-          border-radius: 50%;
-          animation: spin 1s infinite linear;
+          font-size: 2rem;
           margin-bottom: 1rem;
-        }
-        
-        @keyframes spin {
-          to { transform: rotate(360deg); }
+          color: #3498db;
         }
         
         .error-container {
@@ -290,6 +310,29 @@ const Achievements = () => {
         
         .retry-btn:hover {
           background-color: #2980b9;
+        }
+        
+        .no-achievements {
+          grid-column: 1 / -1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem;
+          background-color: #1a1a1a;
+          border-radius: 14px;
+          text-align: center;
+        }
+        
+        .no-achievements-icon {
+          font-size: 3rem;
+          color: #95a5a6;
+          margin-bottom: 1rem;
+        }
+        
+        .no-achievements p {
+          color: #e0e0e0;
+          font-size: 1.1rem;
         }
         
         /* Responsive Design */

@@ -1,362 +1,218 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronRight,
-  faSpinner,
-  faClock,
-  faExclamationTriangle
-} from '@fortawesome/free-solid-svg-icons';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { QUIZ_CONFIG } from './constants';
 import { toast } from 'react-toastify';
-import { QUIZ_CONFIG, API_ENDPOINTS } from './constants';
 
 const QuizQuestions = () => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const { difficulty } = location.state || { difficulty: 'Beginner' };
+  const navigate = useNavigate();
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userAnswers, setUserAnswers] = useState([]);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(QUIZ_CONFIG.QUESTION_TIME);
+  const [answeredState, setAnsweredState] = useState(null); // null, 'correct', or 'incorrect'
   
-  // Get Quiz ID from config based on difficulty
+  // Get quiz difficulty from location state
+  const difficulty = location.state?.difficulty || 'Beginner';
   const quizId = QUIZ_CONFIG.QUIZ_IDS[difficulty] || 1;
   
-  // State variables
-  const [questions, setQuestions] = useState([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedOptionIndex, setSelectedOptionIndex] = useState(null);
-  const [userAnswers, setUserAnswers] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(QUIZ_CONFIG.QUESTION_TIME);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [quizComplete, setQuizComplete] = useState(false);
-  const [score, setScore] = useState(0);
+  // Get questions for selected difficulty
+  const questions = QUIZ_CONFIG.MOCK_QUIZ_DATA[difficulty] || [];
   
-  // Get user ID from session storage
-  const userId = sessionStorage.getItem('userId') || '1';
-  const username = sessionStorage.getItem('username') || 'User';
-  
-  // Timer interval reference
-  let timerInterval = null;
-  
-  // Fetch questions from API (or use mock data)
+  // Effect for timer countdown
   useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        setLoading(true);
-        
-        // Use mock data for development
-        const mockQuestions = QUIZ_CONFIG.MOCK_QUIZ_DATA[difficulty] || [];
-        setQuestions(mockQuestions);
-        
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching questions:', err);
-        setError('Failed to load quiz questions. Please try again.');
-        setLoading(false);
-      }
-    };
-    
-    fetchQuestions();
-    
-    return () => {
-      if (timerInterval) clearInterval(timerInterval);
-    };
-  }, [difficulty]);
-  
-  // Start timer for current question
-  useEffect(() => {
-    if (loading || quizComplete) return;
-    
-    // Reset timer when moving to a new question
-    setTimeLeft(QUIZ_CONFIG.QUESTION_TIME);
-    
-    // Set up timer
-    timerInterval = setInterval(() => {
-      setTimeLeft((prevTime) => {
-        if (prevTime <= 1) {
-          clearInterval(timerInterval);
-          // Auto-submit when time runs out
-          handleTimeUp();
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-    
-    // Clean up interval
-    return () => {
-      clearInterval(timerInterval);
-    };
-  }, [currentQuestionIndex, loading, quizComplete]);
-  
-  // Handle time up - auto-submit current answer
-  const handleTimeUp = () => {
-    if (selectedOptionIndex === null) {
-      // If no option selected, count as incorrect answer
-      const currentQuestion = questions[currentQuestionIndex];
+    if (timeLeft > 0 && !answeredState) {
+      const timer = setTimeout(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
       
-      const answerData = {
+      return () => clearTimeout(timer);
+    } else if (timeLeft === 0 && !answeredState) {
+      // Time's up, auto-submit
+      handleAnswer();
+    }
+  }, [timeLeft, answeredState]);
+  
+  // Reset timer when moving to a new question
+  useEffect(() => {
+    setTimeLeft(QUIZ_CONFIG.QUESTION_TIME);
+    setSelectedOption(null);
+    setAnsweredState(null);
+  }, [currentQuestionIndex]);
+  
+  // Handle answer selection
+  const handleOptionSelect = (optionIndex) => {
+    if (answeredState) return; // Prevent selection after answering
+    setSelectedOption(optionIndex);
+  };
+  
+  // Handle submitting an answer
+  const handleAnswer = () => {
+    if (answeredState) return;
+    
+    const currentQuestion = questions[currentQuestionIndex];
+    
+    // If no option selected, treat as incorrect
+    if (selectedOption === null) {
+      const updatedAnswers = [...userAnswers];
+      updatedAnswers[currentQuestionIndex] = {
         question: currentQuestion.question,
-        selectedOption: 'Time expired',
+        selectedOption: "No answer selected",
         correctOption: currentQuestion.options[currentQuestion.correctAnswer],
         isCorrect: false
       };
+      setUserAnswers(updatedAnswers);
+      setAnsweredState('incorrect');
       
-      setUserAnswers([...userAnswers, answerData]);
-      
-      // Move to next question or finish quiz
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-        setSelectedOptionIndex(null);
-      } else {
-        finishQuiz();
-      }
-    } else {
-      // If option was selected, handle submission
-      handleOptionSubmit();
-    }
-  };
-  
-  // Handle option selection
-  const handleOptionSelect = (index) => {
-    setSelectedOptionIndex(index);
-  };
-  
-  // Handle option submission
-  const handleOptionSubmit = () => {
-    if (selectedOptionIndex === null) {
-      toast.info('Please select an answer');
+      toast.error("Time's up! Moving to next question...");
       return;
     }
     
-    const currentQuestion = questions[currentQuestionIndex];
-    const isCorrect = selectedOptionIndex === currentQuestion.correctAnswer;
+    // Check if answer is correct
+    const isCorrect = selectedOption === currentQuestion.correctAnswer;
     
-    // If correct, increment score
-    if (isCorrect) {
-      setScore(score + 1);
-    }
-    
-    const answerData = {
+    // Update answers array
+    const updatedAnswers = [...userAnswers];
+    updatedAnswers[currentQuestionIndex] = {
       question: currentQuestion.question,
-      selectedOption: currentQuestion.options[selectedOptionIndex],
+      selectedOption: currentQuestion.options[selectedOption],
       correctOption: currentQuestion.options[currentQuestion.correctAnswer],
       isCorrect
     };
     
-    setUserAnswers([...userAnswers, answerData]);
+    setUserAnswers(updatedAnswers);
+    setAnsweredState(isCorrect ? 'correct' : 'incorrect');
     
-    // Move to next question or finish quiz
+    // Show feedback toast
+    if (isCorrect) {
+      toast.success("Correct answer!");
+    } else {
+      toast.error("Incorrect answer!");
+    }
+  };
+  
+  // Move to next question or finish quiz
+  const nextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setSelectedOptionIndex(null);
     } else {
       finishQuiz();
     }
   };
   
-  // Format timer display
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  // Complete the quiz and navigate to results
+  const finishQuiz = () => {
+    // Calculate score
+    const score = userAnswers.filter(answer => answer.isCorrect).length;
+    
+    // Navigate to results page
+    navigate('/quiz/results', {
+      state: {
+        score,
+        totalQuestions: questions.length,
+        userAnswers,
+        difficulty,
+        quizId
+      }
+    });
   };
   
-  // Finish quiz and process results
-  const finishQuiz = async () => {
-    setQuizComplete(true);
-    clearInterval(timerInterval);
-    
-    // Calculate final score
-    const finalScore = userAnswers.filter(answer => answer.isCorrect).length;
-    const totalQuestions = questions.length;
-    
-    console.log(`Quiz completed! Score: ${finalScore}/${totalQuestions}`);
-    console.log(`Quiz ID: ${quizId}, User ID: ${userId}`);
-    
-    try {
-      // Submit quiz results to API
-      const response = await fetch(API_ENDPOINTS.COMPLETE_QUIZ, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          quizId: quizId,
-          score: finalScore
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit quiz results');
-      }
-      
-      console.log('Quiz results submitted successfully:', data);
-      
-      // Navigate to results page
-      navigate('/quiz/results', {
-        state: {
-          score: finalScore,
-          totalQuestions,
-          userAnswers,
-          difficulty,
-          quizId
-        }
-      });
-    } catch (error) {
-      console.error('Error submitting quiz results:', error);
-      toast.error('Failed to save quiz results. Proceeding to results page.');
-      
-      // Navigate to results page anyway
-      navigate('/quiz/results', {
-        state: {
-          score: finalScore,
-          totalQuestions,
-          userAnswers,
-          difficulty,
-          quizId
-        }
-      });
+  // Exit quiz and go back to difficulty selection
+  const exitQuiz = () => {
+    if (window.confirm("Are you sure you want to exit the quiz? Your progress will be lost.")) {
+      navigate('/quiz/difficulty');
     }
   };
   
-  // Loading state
-  if (loading) {
-    return (
-      <div className="quiz-container loading">
-        <div className="loading-spinner">
-          <FontAwesomeIcon icon={faSpinner} spin size="3x" />
-          <p>Loading quiz questions...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Error state
-  if (error) {
-    return (
-      <div className="quiz-container error">
-        <div className="error-message">
-          <FontAwesomeIcon icon={faExclamationTriangle} size="3x" />
-          <h3>Error</h3>
-          <p>{error}</p>
-          <button onClick={() => navigate('/quiz/difficulty')} className="back-button">
-            Back to Quiz Selection
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
-  // Main quiz content
+  // Current question
   const currentQuestion = questions[currentQuestionIndex];
+  
+  if (!currentQuestion) {
+    return <div>Loading questions...</div>;
+  }
   
   return (
     <div className="quiz-container">
       <div className="quiz-header">
-        <h2>{difficulty} Quiz</h2>
-        <div className="timer">
-          <FontAwesomeIcon icon={faClock} className="timer-icon" />
-          <span className={timeLeft <= 10 ? 'time-low' : ''}>
-            {formatTime(timeLeft)}
+        <h1>{difficulty} Quiz</h1>
+        <div className="timer-container">
+          <span className={`timer ${timeLeft < 10 ? 'timer-low' : ''}`}>
+            Time: {timeLeft}s
           </span>
         </div>
       </div>
       
-      <div className="progress-bar-container">
-        <div 
-          className="progress-bar-fill" 
-          style={{ 
-            width: `${((currentQuestionIndex) / questions.length) * 100}%` 
-          }}
-        ></div>
+      <div className="progress-container">
+        <div className="progress-bar-background">
+          <div 
+            className="progress-bar-fill"
+            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+          ></div>
+        </div>
+        <div className="progress-text">
+          Question {currentQuestionIndex + 1} of {questions.length}
+        </div>
       </div>
       
-      <div className="question-counter">
-        Question {currentQuestionIndex + 1} of {questions.length}
-      </div>
-      
-      <div className="question-container">
-        <h3 className="question-text">{currentQuestion.question}</h3>
+      <div className="question-card">
+        <h2 className="question-text">{currentQuestion.question}</h2>
         
         <div className="options-container">
           {currentQuestion.options.map((option, index) => (
             <div 
               key={index}
-              className={`option ${selectedOptionIndex === index ? 'selected' : ''}`}
+              className={`option ${selectedOption === index ? 'selected' : ''} 
+                ${answeredState && index === currentQuestion.correctAnswer ? 'correct' : ''}
+                ${answeredState === 'incorrect' && selectedOption === index ? 'incorrect' : ''}`}
               onClick={() => handleOptionSelect(index)}
             >
-              <div className="option-text">{option}</div>
+              {option}
             </div>
           ))}
         </div>
+        
+        {/* Explanation (shown after answering) */}
+        {answeredState && (
+          <div className="explanation-box">
+            <p>{currentQuestion.explanation}</p>
+          </div>
+        )}
       </div>
       
-      <div className="question-actions">
+      <div className="quiz-actions">
         <button 
-          className="submit-btn"
-          onClick={handleOptionSubmit}
-          disabled={selectedOptionIndex === null}
+          className="exit-btn"
+          onClick={exitQuiz}
         >
-          {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Finish Quiz'}
-          <FontAwesomeIcon icon={faChevronRight} className="btn-icon" />
+          Exit Quiz
         </button>
+        
+        {!answeredState ? (
+          <button 
+            className="next-btn"
+            onClick={handleAnswer}
+            disabled={selectedOption === null}
+          >
+            Submit Answer
+          </button>
+        ) : (
+          <button 
+            className="next-btn"
+            onClick={nextQuestion}
+          >
+            {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Finish Quiz'}
+          </button>
+        )}
       </div>
       
       <style jsx>{`
         .quiz-container {
           max-width: 800px;
-          margin: 0 auto;
-          padding: 1.5rem;
-        }
-        
-        .quiz-container.loading,
-        .quiz-container.error {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 400px;
-          text-align: center;
-        }
-        
-        .loading-spinner {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          color: #3498db;
-        }
-        
-        .loading-spinner p {
-          margin-top: 1rem;
-          color: #e0e0e0;
-        }
-        
-        .error-message {
-          color: #e74c3c;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        
-        .error-message h3 {
-          margin: 1rem 0;
-          font-size: 1.5rem;
-        }
-        
-        .error-message p {
-          margin-bottom: 1.5rem;
-          color: #e0e0e0;
-        }
-        
-        .back-button {
-          background-color: #3498db;
-          color: white;
-          border: none;
-          padding: 0.75rem 1.5rem;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 1rem;
+          margin: 2rem auto;
+          padding: 2rem;
+          background-color: #1a1a1a;
+          border-radius: 16px;
+          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
         
         .quiz-header {
@@ -366,71 +222,66 @@ const QuizQuestions = () => {
           margin-bottom: 1.5rem;
         }
         
-        .quiz-header h2 {
+        .quiz-header h1 {
           color: #ffffff;
-          font-size: 1.6rem;
+          font-size: 1.8rem;
           margin: 0;
         }
         
-        .timer {
+        .timer-container {
           background-color: #2c3e50;
           padding: 0.5rem 1rem;
           border-radius: 8px;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
         }
         
-        .timer-icon {
-          color: #3498db;
+        .timer {
+          color: #ffffff;
+          font-size: 1.2rem;
+          font-weight: bold;
         }
         
-        .time-low {
+        .timer-low {
           color: #e74c3c;
-          animation: pulse 1s infinite;
         }
         
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
+        .progress-container {
+          margin-bottom: 1.5rem;
         }
         
-        .progress-bar-container {
+        .progress-bar-background {
+          width: 100%;
           height: 8px;
-          background-color: #2c3e50;
+          background-color: #34495e;
           border-radius: 4px;
-          margin-bottom: 1rem;
+          overflow: hidden;
+          margin-bottom: 0.5rem;
         }
         
         .progress-bar-fill {
           height: 100%;
-          background-color: #3498db;
+          background-color: #2ecc71;
           border-radius: 4px;
           transition: width 0.3s ease;
         }
         
-        .question-counter {
-          text-align: center;
+        .progress-text {
+          text-align: right;
           color: #bdc3c7;
-          margin-bottom: 2rem;
           font-size: 0.9rem;
         }
         
-        .question-container {
-          background-color: #1a1a1a;
+        .question-card {
+          background-color: #242424;
           border-radius: 12px;
           padding: 1.5rem;
-          margin-bottom: 2rem;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+          margin-bottom: 1.5rem;
         }
         
         .question-text {
           color: #ffffff;
-          font-size: 1.25rem;
+          font-size: 1.4rem;
           margin-top: 0;
           margin-bottom: 1.5rem;
-          line-height: 1.5;
         }
         
         .options-container {
@@ -440,103 +291,83 @@ const QuizQuestions = () => {
         }
         
         .option {
+          padding: 1rem;
           background-color: #2c3e50;
           border-radius: 8px;
-          padding: 1rem;
           cursor: pointer;
           transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
+          border: 2px solid transparent;
+          color: #ffffff;
         }
         
         .option:hover {
           background-color: #34495e;
-          transform: translateY(-2px);
         }
         
         .option.selected {
-          background-color: #3498db;
-          border: 2px solid #2980b9;
+          border-color: #3498db;
+          background-color: rgba(52, 152, 219, 0.2);
         }
         
-        .option-text {
-          color: #ffffff;
-          flex: 1;
+        .option.correct {
+          border-color: #2ecc71;
+          background-color: rgba(46, 204, 113, 0.2);
         }
         
-        .question-actions {
+        .option.incorrect {
+          border-color: #e74c3c;
+          background-color: rgba(231, 76, 60, 0.2);
+        }
+        
+        .explanation-box {
+          margin-top: 1.5rem;
+          padding: 1rem;
+          background-color: #34495e;
+          border-radius: 8px;
+          border-left: 4px solid #3498db;
+        }
+        
+        .explanation-box p {
+          color: #ecf0f1;
+          margin: 0;
+          line-height: 1.5;
+        }
+        
+        .quiz-actions {
           display: flex;
-          justify-content: flex-end;
+          justify-content: space-between;
+          align-items: center;
         }
         
-        .submit-btn {
+        .exit-btn {
+          background-color: #7f8c8d;
+          color: white;
+          border: none;
+          padding: 0.6rem 1rem;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+        
+        .exit-btn:hover {
+          background-color: #95a5a6;
+        }
+        
+        .next-btn {
           background-color: #3498db;
           color: white;
           border: none;
           padding: 0.75rem 1.5rem;
-          border-radius: 8px;
+          border-radius: 6px;
           cursor: pointer;
-          font-size: 1rem;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          transition: all 0.2s ease;
         }
         
-        .submit-btn:hover {
+        .next-btn:hover {
           background-color: #2980b9;
         }
         
-        .submit-btn:disabled {
+        .next-btn:disabled {
           background-color: #95a5a6;
           cursor: not-allowed;
-        }
-        
-        .btn-icon {
-          font-size: 0.8rem;
-        }
-        
-        @media (max-width: 768px) {
-          .quiz-container {
-            padding: 1rem;
-          }
-          
-          .quiz-header h2 {
-            font-size: 1.4rem;
-          }
-          
-          .timer {
-            padding: 0.4rem 0.8rem;
-          }
-          
-          .question-text {
-            font-size: 1.1rem;
-          }
-        }
-        
-        @media (max-width: 480px) {
-          .quiz-header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 1rem;
-          }
-          
-          .timer {
-            align-self: flex-end;
-          }
-          
-          .question-text {
-            font-size: 1rem;
-          }
-          
-          .option {
-            padding: 0.75rem;
-          }
-          
-          .submit-btn {
-            width: 100%;
-            justify-content: center;
-          }
         }
       `}</style>
     </div>
