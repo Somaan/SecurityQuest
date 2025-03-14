@@ -168,8 +168,10 @@ const Navbar = () => {
                             onClick={toggleQuizSubmenu}
                             className={({ isActive }) => isActive || isQuizSection ? 'active' : ''}
                         >
-                            <FontAwesomeIcon icon={faQuestionCircle} className="nav-icon" /> 
-                            Quiz
+                            <div className="nav-link-content">
+                                <FontAwesomeIcon icon={faQuestionCircle} className="nav-icon" /> 
+                                <span className="nav-text">Quiz</span>
+                            </div>
                             <FontAwesomeIcon 
                                 icon={quizSubmenuOpen ? faChevronUp : faChevronDown} 
                                 className="submenu-icon" 
@@ -288,10 +290,19 @@ const Navbar = () => {
                     border-left: 4px solid #2980b9;
                 }
                 
+                .nav-link-content {
+                    display: flex;
+                    align-items: center;
+                }
+                
+                .nav-text {
+                    flex: 1;
+                }
+                
                 .submenu-icon {
-                    margin-left: auto;
                     font-size: 0.8rem;
                     transition: transform 0.3s ease;
+                    margin-left: 5px;
                 }
                 
                 .submenu {
@@ -328,6 +339,34 @@ const Navbar = () => {
                     margin-right: 8px;
                     margin-left: 0;
                     font-size: 0.9rem;
+                }
+                
+                /* Nav icon positioning */
+                .nav-icon {
+                    width: 20px;
+                    text-align: center;
+                    margin-right: 10px;
+                }
+                
+                /* Ensure all NavLinks have consistent styling */
+                .nav-links-box > a {
+                    display: flex;
+                    align-items: center;
+                    padding: 12px 20px;
+                    color: #ecf0f1;
+                    text-decoration: none;
+                    transition: all 0.3s ease;
+                }
+                
+                .nav-links-box > a:hover {
+                    background-color: #34495e;
+                    color: #fff;
+                }
+                
+                .nav-links-box > a.active {
+                    background-color: #3498db;
+                    color: white;
+                    border-left: 4px solid #2980b9;
                 }
                 
                 /* Responsive styles */

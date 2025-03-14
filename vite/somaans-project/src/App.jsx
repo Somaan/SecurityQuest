@@ -1,10 +1,10 @@
+// App.jsx
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Login from './Login';
 import Register from './Register';
 import ErrorPage from './ErrorPage';
 import NavBar from './NavBar';
-import CAPTCHA from './CAPTCHA';
 import { ToastContainer } from 'react-toastify';
 import { ROUTES, PUBLIC_ROUTES, PROTECTED_ROUTES } from './Routes';
 import 'react-toastify/dist/ReactToastify.css';
@@ -18,7 +18,7 @@ import Quiz from './Quiz';
 
 /** 
 - Main application component
-  - Handles routing logic and authentification state management
+  - Handles routing logic and authentication state management
   - Controls Access to protected and public routes
   - Checks for remembered user on initial load
 */
@@ -33,6 +33,13 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
     sessionStorage.getItem('isAuthenticated') === 'true'
   );
+
+  // Determine if current path is part of quiz routes to handle the NavBar visibility
+  const isQuizPage = location.pathname.includes('/quiz');
+  const isQuizResultsPage = location.pathname.includes('/quiz/results');
+  
+  // Hide navbar for specific quiz pages
+  const hideNavBar = isQuizPage;
 
   // Check for remembered user on initial load
   useEffect(() => {
@@ -73,7 +80,8 @@ function App() {
 
   return (
     <>
-      {!isPublicRoute && !isErrorPage && <NavBar />}
+      {/* Only show NavBar when not on quiz pages */}
+      {!isPublicRoute && !isErrorPage && !hideNavBar && <NavBar />}
       
       <Routes>
         {/* Public Routes */}
@@ -83,15 +91,16 @@ function App() {
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPassword />} />
         <Route path={ROUTES.RESET_PASSWORD} element={<ResetPassword />} />
 
-
         {/* Protected Routes */}
         <Route path={ROUTES.DASHBOARD} element={
           isAuthenticated ? (
-          <Dashboard />
-        ) : (
-          <Navigate to={ROUTES.LOGIN} replace />
-        )
+            <Dashboard />
+          ) : (
+            <Navigate to={ROUTES.LOGIN} replace />
+          )
         } />
+        
+        {/* Quiz Routes - Special handling for navbar visibility */}
         <Route path={ROUTES.QUIZ + '/*'} element={
           isAuthenticated ? (
             <Quiz />
@@ -99,6 +108,7 @@ function App() {
             <Navigate to={ROUTES.LOGIN} replace />
           )
         } />
+        
         <Route path={ROUTES.ACHIEVEMENTS} element={
           isAuthenticated ? (
             <Achievements />
@@ -136,6 +146,12 @@ function App() {
           background-color: #242424;
           color: white;
           font-size: 1.5rem;
+        }
+        
+        /* Ensure content is properly positioned when navbar is hidden */
+        .content-wrapper-full {
+          margin-left: 0;
+          width: 100%;
         }
       `}</style>
     </>

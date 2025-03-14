@@ -18,7 +18,8 @@ console.log('API Key length:', process.env.SENDGRID_API_KEY ? process.env.SENDGR
 
 // Middleware
 app.use(cors({
-    origin: 'http://localhost:5173' 
+    origin: 'http://localhost:5173',
+    credentials: true
 }));
 app.use(express.json());
 
@@ -577,6 +578,15 @@ app.post('/api/quiz/complete', async (req, res) => {
                 score = EXCLUDED.score
             RETURNING id
         `, [userId, quizId, score]);
+
+        console.log("quiz completion recorded with ID:", result.rows[0].id);
+
+        await pool.query (`
+            UPDATE users
+            SET quiz_streak = COALESCE(quiz_streak, 0) + 1,
+                last_quiz_update = CURRENT_DATE
+            WHERE id = $1
+            `,[userId]);
         
         // The update_quiz_streak trigger will automatically update the user's quiz streak
         

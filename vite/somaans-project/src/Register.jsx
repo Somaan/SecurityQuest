@@ -160,7 +160,7 @@ const Register = () => {
       theme: "dark",
       onClose: () => {
         resetAllFields();
-        navigate('/dashboard'); // lowercase, navigate after toast closes
+      window.location.href = ROUTES.DASHBOARD;
       }
     });
   };

@@ -112,7 +112,8 @@ const Achievements = () => {
     <div className="content-wrapper">
       <div className="achievements-container">
         <div className="achievements-header">
-          <h2>Let's see how well you are doing, {username}</h2>
+          <h2>Let's see what acheivements you've received, {username}</h2>
+          <h3>As you complete the quizzes, you will be able to see view your acheivements here. </h3>
         </div>
         
         <div className="achievements-grid">

@@ -132,9 +132,16 @@ const LoginForm = () => {
   };
 
   const handleCaptchaSuccess = () => {
-    // First set authentication in session storage
     sessionStorage.setItem('isAuthenticated', 'true');
     sessionStorage.setItem('username', formData.username);
+
+    if (data && data.user && data.user.id) {
+      sessionStorage.setItem('userId', data.user.id.toString());
+      console.log('Stored userID:', data.user.id);
+    } else {
+      console.warn('UserId not available in response, using default');
+      sessionStorage.setItem('userId', '1');
+    }
     
     // Show success message
     toast.success("Login successful!", {
@@ -146,7 +153,6 @@ const LoginForm = () => {
       draggable: true,
       theme: "dark",
       onClose: () => {
-        // Hard redirect to dashboard without any fancy React Router
         window.location.href = ROUTES.DASHBOARD;
       }
     });
@@ -231,7 +237,7 @@ const LoginForm = () => {
                         onChange={handleRememberMeChange}
                         className="remember-me-checkbox"
                       />
-                      <span>Remember Me</span>
+                      <span>Keep me logged in </span>
                     </label>
                   </div>
                   <div className="forgot-password-container">
@@ -291,10 +297,10 @@ const LoginForm = () => {
               gap: 10px;
             }
             .char-count {
-              top: 30px !important;
+              top: 28px !important;
             }
             .toggle-password-btn {
-              top: 30px !important;
+              top: 28px !important;
             }
             .login-options-row {
               display: flex;
