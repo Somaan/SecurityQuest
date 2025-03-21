@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFireFlameSimple, faSpinner, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faFireFlameSimple, faSpinner, faExclamationTriangle, faCalendarCheck, faQuestionCircle, faClock } from '@fortawesome/free-solid-svg-icons';
 import { API_ENDPOINTS } from './constants';
 import { toast } from 'react-toastify';
 
@@ -36,7 +36,7 @@ const Dashboard = () => {
         console.log('User streaks data:', streaksData);
         console.log('User achievements data:', achievementsData);
         
-        setUserData(streaksData.userData);
+        setUserData(streaksData.userData || {});
         setQuizHistory(streaksData.quizHistory || []);
         setAchievements(achievementsData.achievements || []);
       } catch (err) {
@@ -55,14 +55,14 @@ const Dashboard = () => {
   const calculateProgress = () => {
     if (!userData) return 0;
     
-    // Calculate based on quiz completions and achievements
-    const totalQuizzes = userData.total_quizzes || quizHistory.length || 0;
+    // Calculate based on total quiz completions (not just unique days) and achievements
+    const totalCompletions = userData.total_quizzes || quizHistory.length || 0;
     const unlockedAchievements = achievements.filter(a => a.unlocked).length || 0;
     
     // Simple algorithm for progress
-    const progress = Math.min(100, (totalQuizzes * 10 + unlockedAchievements * 5));
+    const progress = Math.min(100, (totalCompletions * 10 + unlockedAchievements * 5));
     
-    return progress || 0;
+    return Math.round(progress) || 0;
   };
 
   if (loading) {
@@ -102,8 +102,11 @@ const Dashboard = () => {
 
   // Get most recent quiz completions
   const recentQuizzes = quizHistory
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 2);
+    .sort((a, b) => new Date(b.completion_date || b.date) - new Date(a.completion_date || a.date))
+    .slice(0, 3); // Show up to 3 recent quizzes
+
+  // Get total quiz completions
+  const totalQuizCompletions = userData?.total_quizzes || quizHistory.length || 0;
 
   return (
     <div className="content-wrapper">
@@ -161,14 +164,21 @@ const Dashboard = () => {
           <div className="dashboard-card activity-card">
             <h3>Recent Activity</h3>
             <div className="activity-list">
-              {recentQuizzes.map((quiz, index) => (
-                <p key={`quiz-${index}`}>
-                  Completed {getDifficultyName(quiz.quiz_id)} quiz with score {quiz.score}%
-                  {quiz.score >= 70 && 
-                    <FontAwesomeIcon icon={faFireFlameSimple} style={{ color: '#ff6b6b', marginLeft: '6px' }} />
-                  }
-                </p>
-              ))}
+              {recentQuizzes.length > 0 ? (
+                recentQuizzes.map((quiz, index) => (
+                  <p key={`quiz-${index}`}>
+                    Completed {getDifficultyName(quiz.quiz_id)} quiz with a score of: {quiz.score}%
+                    {quiz.score >= 70 && 
+                      <FontAwesomeIcon icon={faFireFlameSimple} style={{ color: '#ff6b6b', marginLeft: '6px' }} />
+                    }
+                    <span className="quiz-timestamp">
+                      {formatDate(quiz.completion_date || quiz.date)}
+                    </span>
+                  </p>
+                ))
+              ) : (
+                <p>No quizzes completed yet. Try taking a quiz!</p>
+              )}
               
               {recentAchievements.map((achievement, index) => (
                 <p key={`achievement-${index}`}>
@@ -184,9 +194,52 @@ const Dashboard = () => {
                 </p>
               )}
               
-              {(!userData || (recentQuizzes.length === 0 && recentAchievements.length === 0)) && (
+              {(!userData || (recentQuizzes.length === 0 && recentAchievements.length === 0 && !(userData.login_streak > 1))) && (
                 <p>No recent activity. Try taking a quiz!</p>
               )}
+            </div>
+          </div>
+          
+          <div className="dashboard-card quiz-stats-card">
+            <h3>Quiz Statistics</h3>
+            <div className="quiz-stats-grid">
+              <div className="stat-item">
+                <div className="stat-icon">
+                  <FontAwesomeIcon icon={faQuestionCircle} />
+                </div>
+                <div className="stat-label">Total Completions</div>
+                <div className="stat-value">{totalQuizCompletions}</div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-icon">
+                  <FontAwesomeIcon icon={faCalendarCheck} />
+                </div>
+                <div className="stat-label">Unique Quiz Days</div>
+                <div className="stat-value">{userData?.quiz_days_count || 0}</div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-icon">
+                  <FontAwesomeIcon icon={faFireFlameSimple} />
+                </div>
+                <div className="stat-label">Quiz Streak</div>
+                <div className="stat-value">
+                  {userData?.quiz_streak || 0}
+                  <span className="stat-unit"> {userData?.quiz_streak === 1 ? 'day' : 'days'}</span>
+                </div>
+                <div className="stat-tooltip">
+                  Consecutive days with at least one quiz
+                </div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-icon">
+                  <FontAwesomeIcon icon={faClock} />
+                </div>
+                <div className="stat-label">Longest Streak</div>
+                <div className="stat-value">
+                  {userData?.longest_quiz_streak || 0}
+                  <span className="stat-unit"> {userData?.longest_quiz_streak === 1 ? 'day' : 'days'}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -261,11 +314,12 @@ const Dashboard = () => {
           height: 150px;
           margin: 1rem auto;
           position: relative;
-          background: conic-gradient(#646cff ${calculateProgress() * 3.6}deg, #333 0);
+          background: conic-gradient(#646cff calc(var(--progress) * 3.6deg), #333 0);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
+          --progress: ${calculateProgress()};
         }
 
         .progress-circle-inner {
@@ -317,18 +371,122 @@ const Dashboard = () => {
         .retry-btn:hover {
           background-color: #2980b9;
         }
+        
+        .quiz-timestamp {
+          font-size: 0.8rem;
+          color: #999;
+          margin-left: 10px;
+          display: block;
+        }
+        
+        .quiz-stats-card {
+          grid-column: span 2;
+        }
+        
+        .quiz-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1rem;
+        }
+        
+        .stat-item {
+          background-color: #242424;
+          padding: 1rem;
+          border-radius: 8px;
+          text-align: center;
+          position: relative;
+        }
 
+        .stat-icon {
+          background-color: rgba(100, 108, 255, 0.2);
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 0.75rem;
+          color: #646cff;
+        }
+        
+        .stat-label {
+          font-size: 0.9rem;
+          color: #999;
+          margin-bottom: 0.5rem;
+        }
+        
+        .stat-value {
+          font-size: 1.5rem;
+          font-weight: bold;
+          color: #646cff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .stat-unit {
+          font-size: 0.9rem;
+          color: #aaa;
+          font-weight: normal;
+        }
+
+        .stat-tooltip {
+          position: absolute;
+          bottom: -40px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #2c3e50;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 0.8rem;
+          color: #ecf0f1;
+          opacity: 0;
+          visibility: hidden;
+          transition: all 0.2s ease;
+          z-index: 10;
+          width: max-content;
+          max-width: 200px;
+          pointer-events: none;
+        }
+
+        .stat-tooltip:after {
+          content: '';
+          position: absolute;
+          top: -5px;
+          left: 50%;
+          transform: translateX(-50%);
+          border-width: 0 5px 5px 5px;
+          border-style: solid;
+          border-color: transparent transparent #2c3e50 transparent;
+        }
+
+        .stat-item:hover .stat-tooltip {
+          opacity: 1;
+          visibility: visible;
+          bottom: -30px;
+        }
+        
         @media (max-width: 768px) {
           .dashboard-grid {
             grid-template-columns: 1fr;
           }
 
-          .activity-card {
+          .activity-card, .quiz-stats-card {
             grid-column: span 1;
+          }
+          
+          .quiz-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
           }
 
           .dashboard-container {
             padding: 1rem;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .quiz-stats-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
@@ -341,7 +499,7 @@ const Dashboard = () => {
     const beginnerQuizzes = quizHistory.filter(q => q.quiz_id === 1);
     if (beginnerQuizzes.length === 0) return 0;
     
-    // Return highest score
+    // Return highest score from all completions (not just one per day)
     const highestScore = Math.max(...beginnerQuizzes.map(q => q.score));
     return highestScore;
   }
@@ -351,7 +509,7 @@ const Dashboard = () => {
     const intermediateQuizzes = quizHistory.filter(q => q.quiz_id === 2);
     if (intermediateQuizzes.length === 0) return 0;
     
-    // Return highest score
+    // Return highest score from all completions
     const highestScore = Math.max(...intermediateQuizzes.map(q => q.score));
     return highestScore;
   }
@@ -361,7 +519,7 @@ const Dashboard = () => {
     const advancedQuizzes = quizHistory.filter(q => q.quiz_id === 3);
     if (advancedQuizzes.length === 0) return 0;
     
-    // Return highest score
+    // Return highest score from all completions
     const highestScore = Math.max(...advancedQuizzes.map(q => q.score));
     return highestScore;
   }
@@ -372,6 +530,17 @@ const Dashboard = () => {
       case 2: return 'Intermediate';
       case 3: return 'Advanced';
       default: return 'Unknown';
+    }
+  }
+  
+  function formatDate(dateString) {
+    if (!dateString) return 'Unknown date';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString();
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return 'Invalid date';
     }
   }
 };

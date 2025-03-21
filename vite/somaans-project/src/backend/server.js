@@ -407,17 +407,12 @@ app.get('/api/test/remember-tokens', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
-
 // Get Users for Leaderboard
 app.get('/api/users', async (req, res) => {
     try {
         // Get all users with streak data
         const result = await pool.query(`
-            SELECT 
+           SELECT 
                 u.id, 
                 u.username, 
                 u.created_at, 
@@ -437,12 +432,22 @@ app.get('/api/users', async (req, res) => {
                     SELECT COUNT(*) 
                     FROM quiz_completions 
                     WHERE user_id = u.id
+                ) AS total_quiz_completions,
+                (
+                    SELECT COUNT(DISTINCT DATE(completion_date)) 
+                    FROM quiz_completions 
+                    WHERE user_id = u.id
                 ) AS quiz_days_count
             FROM users u
             ORDER BY 
                 (COALESCE(u.login_streak, 0) + COALESCE(u.quiz_streak, 0)) DESC, 
                 u.username ASC
         `);
+
+        // Log user data for debugging
+        result.rows.forEach(user => {
+            console.log(`User ${user.username} (ID: ${user.id}): ${user.total_quiz_completions} total completions, ${user.quiz_days_count} unique days`);
+        });
         
         res.json({ 
             success: true, 
@@ -485,12 +490,20 @@ app.get('/api/users/quiz-history', async (req, res) => {
                     json_build_object(
                         'date', completion_date,
                         'quiz_id', quiz_id,
-                        'score', score
+                        'score', score,
+                        'total_questions', total_questions,
+                        'correct_answers', correct_answers,
+                        'completion_details', completion_details
                     ) ORDER BY completion_date DESC
                 ) AS quiz_completions
             FROM quiz_completions
             GROUP BY user_id
         `);
+
+        result.rows.forEach(row => {
+            const completionsCount = row.quiz_completions ? row.quiz_completions.length : 0;
+            console.log(`User ${row.user_id} has ${completionsCount} quiz completions`);
+        });
         
         res.json({
             success: true,
@@ -502,12 +515,57 @@ app.get('/api/users/quiz-history', async (req, res) => {
     }
 });
 
-// API endpoint to get detailed streak info for a specific user
+// Endpoint to reset user streak data - NEW
+app.post('/api/users/:userId/reset-streaks', async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+      // Reset streak data for the specified user
+      await pool.query(`
+        UPDATE users
+        SET quiz_streak = 0,
+            longest_quiz_streak = 0,
+            last_quiz_update = NULL
+        WHERE id = $1
+      `, [userId]);
+      
+      res.json({
+        success: true,
+        message: 'User streak data reset successfully'
+      });
+    } catch (error) {
+      console.error('Error resetting user streaks:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+});
+  
+// Add this endpoint to reset all users' streak data - NEW
+app.post('/api/admin/reset-all-streaks', async (req, res) => {
+    try {
+      // Reset streak data for all users
+      await pool.query(`
+        UPDATE users
+        SET quiz_streak = 0,
+            longest_quiz_streak = 0,
+            last_quiz_update = NULL
+      `);
+      
+      res.json({
+        success: true,
+        message: 'All users streak data reset successfully'
+      });
+    } catch (error) {
+      console.error('Error resetting all user streaks:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// IMPROVED - API endpoint to get detailed streak info for a specific user
 app.get('/api/users/:userId/streaks', async (req, res) => {
     const userId = req.params.userId;
     
     try {
-        // Get user streak data
+        // Get user streak data with corrected calculations
         const userResult = await pool.query(`
             SELECT 
                 id, 
@@ -538,16 +596,66 @@ app.get('/api/users/:userId/streaks', async (req, res) => {
         
         // Get quiz completion history
         const quizHistoryResult = await pool.query(`
-            SELECT completion_date, quiz_id, score
+            SELECT 
+                qc.completion_date, 
+                qc.quiz_id, 
+                qc.score, 
+                qc.total_questions, 
+                qc.correct_answers,
+                COUNT(*) OVER() as total_count
+            FROM quiz_completions qc
+            WHERE qc.user_id = $1
+            ORDER BY qc.completion_date DESC
+        `, [userId]);
+
+        // Count unique quiz days
+        const uniqueDaysResult = await pool.query(`
+            SELECT COUNT(DISTINCT DATE(completion_date)) as unique_days
             FROM quiz_completions
             WHERE user_id = $1
-            ORDER BY completion_date DESC
-            LIMIT 30
         `, [userId]);
+        
+        // Calculate total quizzes
+        const totalQuizzes = quizHistoryResult.rows.length > 0 
+            ? parseInt(quizHistoryResult.rows[0].total_count) 
+            : 0;
+        
+        // Count quizzes by difficulty level
+        const difficultyCountsResult = await pool.query(`
+            SELECT 
+                quiz_id, 
+                COUNT(*) as count 
+            FROM quiz_completions
+            WHERE user_id = $1
+            GROUP BY quiz_id
+        `, [userId]);
+        
+        // Format the difficulty counts
+        const difficultyCounts = {
+            1: 0, // Beginner
+            2: 0, // Intermediate  
+            3: 0  // Advanced
+        };
+        
+        difficultyCountsResult.rows.forEach(row => {
+            difficultyCounts[row.quiz_id] = parseInt(row.count);
+        });
+
+        // Log the counts
+        console.log(`User ${userId} has ${totalQuizzes} quiz completions`);
+        console.log(`User ${userId} has completed quizzes on ${uniqueDaysResult.rows[0].unique_days} unique days`);
+        
+        // Enhanced user data object with correct counts
+        const enhancedUserData = {
+            ...userResult.rows[0],
+            total_quizzes: totalQuizzes,
+            quiz_days_count: parseInt(uniqueDaysResult.rows[0].unique_days),
+            difficulty_counts: difficultyCounts
+        };
         
         res.json({
             success: true,
-            userData: userResult.rows[0],
+            userData: enhancedUserData,
             loginHistory: loginHistoryResult.rows.map(row => row.login_date),
             quizHistory: quizHistoryResult.rows
         });
@@ -557,50 +665,224 @@ app.get('/api/users/:userId/streaks', async (req, res) => {
     }
 });
 
-// Endpoint to record a quiz completion (call this when a user completes a quiz)
+// IMPROVED - Endpoint to record a quiz completion 
 app.post('/api/quiz/complete', async (req, res) => {
-    const { userId, quizId, score } = req.body;
+    const { 
+        userId,
+        quizId, 
+        score,
+        totalQuestions = 5,
+        correctAnswers,
+        completionDetails,
+        submissionId
+    } = req.body;
+
+    console.log('Received quiz completion data:', {
+        userId, quizId, score,
+        totalQuestions, correctAnswers,
+        completionDetailsLength: completionDetails ? completionDetails.length : 0,
+        submissionId: submissionId || 'Not provided'
+    });
     
     try {
+        // Check for duplicate submission by submissionId
+        if (submissionId) {
+            try {
+                // First check if the submission_id column exists
+                try {
+                    await pool.query(`
+                        SELECT submission_id FROM quiz_completions WHERE submission_id IS NOT NULL LIMIT 1
+                    `);
+                } catch (error) {
+                    if (error.message.includes('column "submission_id" does not exist')) {
+                        console.log('Adding submission_id column to quiz_completions table');
+                        await pool.query(`
+                            ALTER TABLE quiz_completions 
+                            ADD COLUMN submission_id VARCHAR(255)
+                        `);
+                        
+                        await pool.query(`
+                            CREATE INDEX IF NOT EXISTS quiz_completions_submission_id_idx 
+                            ON quiz_completions(submission_id)
+                        `);
+                    }
+                }
+                
+                // Now check for existing submissions with this ID
+                const existingSubmission = await pool.query(
+                    'SELECT id FROM quiz_completions WHERE submission_id = $1',
+                    [submissionId]
+                );
+                
+                if (existingSubmission.rows.length > 0) {
+                    console.log(`Duplicate submission detected with ID: ${submissionId}`);
+                    return res.json({
+                        success: true,
+                        message: 'Quiz completion already recorded',
+                        duplicate: true,
+                        completionId: existingSubmission.rows[0].id
+                    });
+                }
+            } catch (error) {
+                console.error('Error checking for duplicate submission:', error);
+                // Continue with submission even if duplicate check fails
+            }
+        }
+
         // Validate userId
         const userExists = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
         if (userExists.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
+
+        // Calculate correctAnswers if not provided but completionDetails exists
+        let actualCorrectAnswers = correctAnswers;
+        if (!actualCorrectAnswers && completionDetails && Array.isArray(completionDetails)) {
+            actualCorrectAnswers = completionDetails.filter(detail => detail.isCorrect).length;
+            console.log("Calculated correct answers from details:", actualCorrectAnswers);
+        } else if (!actualCorrectAnswers && score) {
+            // If no correct answers but score is provided, estimate from score percentage
+            actualCorrectAnswers = Math.round((score / 100) * totalQuestions);
+            console.log("Estimated correct answers from score:", actualCorrectAnswers);
+        }
+
+        const finalTotalQuestions = totalQuestions || 5;
+        const finalCorrectAnswers = actualCorrectAnswers || 0;
+        const finalCompletionDetails = completionDetails ? JSON.stringify(completionDetails) : null;
         
         // Record quiz completion
         const result = await pool.query(`
-            INSERT INTO quiz_completions (user_id, quiz_id, score)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (user_id, completion_date) 
-            DO UPDATE SET
-                quiz_id = EXCLUDED.quiz_id,
-                score = EXCLUDED.score
-            RETURNING id
-        `, [userId, quizId, score]);
+            INSERT INTO quiz_completions (
+                user_id,
+                quiz_id,
+                score,
+                completion_date,
+                total_questions,
+                correct_answers,
+                completion_details,
+                submission_id
+            )
+            VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7)
+            RETURNING id, completion_date
+        `, [
+            userId,
+            quizId,
+            score,
+            finalTotalQuestions, 
+            finalCorrectAnswers,
+            finalCompletionDetails,
+            submissionId
+        ]);
+        
+        const completionId = result.rows[0].id;
+        const completionDate = result.rows[0].completion_date;
+        console.log("Quiz completion recorded with ID:", completionId);
 
-        console.log("quiz completion recorded with ID:", result.rows[0].id);
+        // If completion details are provided, store individual answers for better querying
+        if (completionDetails && Array.isArray(completionDetails) && completionDetails.length > 0) {
+            console.log("Storing detailed answer records");
+            
+            for (const detail of completionDetails) {
+                await pool.query(`
+                    INSERT INTO quiz_answers (
+                        completion_id,
+                        question_index,
+                        question,
+                        user_answer,
+                        correct_answer,
+                        is_correct
+                    ) VALUES ($1, $2, $3, $4, $5, $6)
+                `, [
+                    completionId,
+                    detail.questionIndex,
+                    detail.question,
+                    detail.userAnswer,
+                    detail.correctAnswer,
+                    detail.isCorrect
+                ]);
+            }
+        }
 
-        await pool.query (`
-            UPDATE users
-            SET quiz_streak = COALESCE(quiz_streak, 0) + 1,
-                last_quiz_update = CURRENT_DATE
+        // Count the number of completed quizzes for this user
+        const quizCountResult = await pool.query(`
+            SELECT COUNT(*) as count
+            FROM quiz_completions
+            WHERE user_id = $1
+        `, [userId]);
+        
+        const totalQuizCount = parseInt(quizCountResult.rows[0].count);
+        
+        // Update quiz streak based on date
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        
+        // Get last quiz date
+        const lastQuizDateResult = await pool.query(`
+            SELECT last_quiz_update
+            FROM users
             WHERE id = $1
-            `,[userId]);
+        `, [userId]);
         
-        // The update_quiz_streak trigger will automatically update the user's quiz streak
-        
+        const lastUpdate = lastQuizDateResult.rows[0]?.last_quiz_update ?
+            new Date(lastQuizDateResult.rows[0].last_quiz_update).toISOString().slice(0, 10) : null;
+            
+        // Only update if it's the first quiz of the day
+        if (lastUpdate !== today) {
+            // Check if it's a continuation from yesterday
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().slice(0, 10);
+            
+            if (lastUpdate === yesterdayStr || lastUpdate === null) {
+                // Continue streak - it's either the first quiz or a continuation from yesterday
+                await pool.query(`
+                    UPDATE users
+                    SET quiz_streak = COALESCE(quiz_streak, 0) + 1,
+                        longest_quiz_streak = GREATEST(COALESCE(longest_quiz_streak, 0), COALESCE(quiz_streak, 0) + 1),
+                        last_quiz_update = CURRENT_DATE
+                    WHERE id = $1
+                `, [userId]);
+                console.log("Updated quiz streak - continuation");
+            } else {
+                // Reset streak - it's been more than a day since the last quiz
+                await pool.query(`
+                    UPDATE users
+                    SET quiz_streak = 1,
+                        last_quiz_update = CURRENT_DATE
+                    WHERE id = $1
+                `, [userId]);
+                console.log("Reset quiz streak - gap in continuity");
+            }
+        } else {
+            console.log("User already completed a quiz today, not updating streak");
+            // Still update the last_quiz_update to ensure timestamp is current
+            await pool.query(`
+                UPDATE users
+                SET last_quiz_update = CURRENT_TIMESTAMP
+                WHERE id = $1
+            `, [userId]);
+        }
+
+        // Get updated user data for response
+        const updatedUser = await pool.query(`
+            SELECT quiz_streak, longest_quiz_streak
+            FROM users
+            WHERE id = $1
+        `, [userId]);
+    
         res.json({
             success: true,
             message: 'Quiz completion recorded successfully',
-            completionId: result.rows[0].id
+            completionId: completionId,
+            completionDate: completionDate,
+            totalQuizzes: totalQuizCount,
+            quizStreak: updatedUser.rows[0]?.quiz_streak || 1,
+            longestQuizStreak: updatedUser.rows[0]?.longest_quiz_streak || 1
         });
     } catch (error) {
         console.error('Error recording quiz completion:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
-
 
 // API endpoint to get user achievements
 app.get('/api/users/:userId/achievements', async (req, res) => {
@@ -698,7 +980,9 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
       console.error(`Error fetching achievements for user ${userId}:`, error);
       res.status(500).json({ error: 'Server error' });
     }
-  });
-  
-  // Update constants.js to include the new endpoint:
-  // GET_USER_ACHIEVEMENTS: 'http://localhost:5000/api/users/:userId/achievements',
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});

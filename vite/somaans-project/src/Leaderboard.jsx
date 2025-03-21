@@ -8,7 +8,9 @@ import {
     faFireFlameSimple,
     faSpinner,
     faExclamationTriangle,
-    faInfoCircle
+    faInfoCircle,
+    faCalendarCheck,
+    faQuestionCircle
 } from '@fortawesome/free-solid-svg-icons';
 import { API_ENDPOINTS } from './constants';
 import { toast } from "react-toastify";
@@ -20,6 +22,7 @@ const Leaderboard = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [quizHistory, setQuizHistory] = useState([]);
 
     // Get current user from session storage
     const currentUsername = sessionStorage.getItem('username') || '';
@@ -27,7 +30,51 @@ const Leaderboard = () => {
     // Initial data fetch
     useEffect(() => {
         fetchUsers();
+        fetchQuizHistory();
     }, []);
+    
+    // Recalculate user data when quiz history changes
+    useEffect(() => {
+        if (quizHistory.length > 0) {
+            // Recalculate user data after quiz history is loaded
+            console.log("Quiz history updated, recalculating user data...");
+            fetchUsers();
+        }
+    }, [quizHistory]);
+    
+    // Get user's current rank and set initial page
+    const currentUserRank = users.findIndex(user => user.username === currentUsername) + 1;
+    
+    useEffect(() => {
+        if (currentUserRank > 0) {
+            setCurrentPage(Math.ceil(currentUserRank / itemsPerPage));
+        }
+    }, [currentUserRank, users]);
+    
+    // Fetch quiz history for all users
+    const fetchQuizHistory = async () => {
+        try {
+            console.log('Fetching quiz history data...');
+            const response = await fetch(API_ENDPOINTS.GET_USER_QUIZ_HISTORY);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch quiz history');
+            }
+
+            const data = await response.json();
+            console.log('Quiz history data received:', data);
+
+            if (data.success && data.quizHistory) {
+                console.log('Setting quiz history:', data.quizHistory);
+                setQuizHistory(data.quizHistory);
+            } else {
+                console.warn('Missing or invalid quiz history data:', data);
+            }
+        } catch (err) {
+            console.error('Error fetching quiz history', err);
+            // Don't set error state here to not block the leaderboard display
+        }
+    };
     
     const fetchUsers = async () => {
         setLoading(true);
@@ -47,41 +94,41 @@ const Leaderboard = () => {
                 const formattedUsers = data.users.map(user => {
                     // Calculate stats from user data
                     const totalQuizzes = user.quiz_days_count || 0;
+                    const totalCompletions = user.total_quiz_completions || 0;
                     const loginStreak = user.login_streak || 0;
                     const quizStreak = user.quiz_streak || 0;
-                    const combinedStreak = loginStreak + quizStreak;
+                    const score = calculateTotalScore(user);
+                    const accuracy = calculateAccuracy(user);
                     
                     return {
                         id: user.id,
                         username: user.username,
-                        // Use real score if available, otherwise use a placeholder
-                        score: calculateTotalScore(user),
-                        accuracy: calculateAccuracy(user),
+                        score: score,
+                        accuracy: accuracy,
                         completedChallenges: totalQuizzes,
-                        loginStreak,
-                        quizStreak,
-                        combinedStreak,
+                        totalCompletions: totalCompletions,
+                        loginStreak: loginStreak,
+                        quizStreak: quizStreak,
                         longestLoginStreak: user.longest_login_streak || 0,
                         longestQuizStreak: user.longest_quiz_streak || 0,
-                        streak: combinedStreak, // Default to combined streak
                         lastLogin: user.last_login,
                         lastLoginUpdate: user.last_login_update,
-                        lastQuizUpdate: user.last_quiz_update,
-                        streakReset: {
-                            login: false,
-                            quiz: false
-                        }
+                        lastQuizUpdate: user.last_quiz_update
                     };
                 });
 
-                // Sort users based on score and streak
+                // Sort users based on score, then by quiz streak and login streak
                 formattedUsers.sort((a, b) => {
                     // Primary sort by score
                     const scoreDiff = b.score - a.score;
                     if (scoreDiff !== 0) return scoreDiff;
                     
-                    // Secondary sort by streak
-                    return b.streak - a.streak;
+                    // Secondary sort by quiz streak
+                    const quizStreakDiff = b.quizStreak - a.quizStreak;
+                    if (quizStreakDiff !== 0) return quizStreakDiff;
+                    
+                    // Tertiary sort by login streak
+                    return b.loginStreak - a.loginStreak;
                 });
 
                 setUsers(formattedUsers);
@@ -99,30 +146,192 @@ const Leaderboard = () => {
     };
 
     // Helper function to calculate a user's total score from quiz data
+    // Each correct question is worth 10 points, aggregated across all completions
     function calculateTotalScore(user) {
-        // If we have specific score data use it, otherwise use a placeholder
-        // This placeholder could be replaced with real calculation once you have more data
-        return Math.floor(Math.random() * 2000) + 3000;
+        console.log("Calculating score for user:", user.username, "ID:", user.id);
+        
+        // Find this user's quiz history
+        const userQuizData = quizHistory.find(h => h.user_id === user.id);
+        console.log("Quiz history data found:", userQuizData);
+        
+        // If no quiz history found, use fallback from total_quiz_completions
+        if (!userQuizData || !userQuizData.quiz_completions) {
+          console.log("No quiz completions found for user", user.username);
+          
+          // If we have total_quiz_completions, use it to generate a fallback score
+          if (user.total_quiz_completions && user.total_quiz_completions > 0) {
+            console.log("Using total_quiz_completions for fallback score:", user.total_quiz_completions);
+            return user.total_quiz_completions * 50; // Rough estimate: 5 questions per quiz, 10 points per question
+          }
+          
+          return 0; // No quizzes completed
+        }
+        
+        // Handle different potential data structures for quiz_completions
+        let quizCompletions;
+        if (Array.isArray(userQuizData.quiz_completions)) {
+          quizCompletions = userQuizData.quiz_completions;
+        } else if (typeof userQuizData.quiz_completions === 'object') {
+          // It might be a string that needs parsing
+          try {
+            const parsed = JSON.parse(userQuizData.quiz_completions);
+            quizCompletions = Array.isArray(parsed) ? parsed : null;
+          } catch (e) {
+            // Not a valid JSON string
+            console.error("Failed to parse quiz_completions", e);
+            quizCompletions = null;
+          }
+        }
+        
+        console.log("Quiz completions array length:", quizCompletions?.length || 0);
+        
+        // Final check to make sure we have valid quiz completions
+        if (!quizCompletions || !Array.isArray(quizCompletions) || quizCompletions.length === 0) {
+          console.log("No valid quiz completions array for user", user.username);
+          return 0;
+        }
+        
+        // Calculate total score based on quiz completions - include ALL quiz completions
+        let totalScore = 0;
+        
+        quizCompletions.forEach(completion => {
+          // Default values for quiz completion
+          const totalQuestions = completion.total_questions || 5;
+          let correctAnswers = completion.correct_answers;
+          
+          // If we have correct_answers directly, use that
+          if (correctAnswers !== null && correctAnswers !== undefined) {
+            const quizPoints = correctAnswers * 10;
+            totalScore += quizPoints;
+            console.log(`Quiz ${completion.quiz_id} with correct_answers data: ${correctAnswers} correct, ${quizPoints} points`);
+          }
+          // Check if this is an enhanced completion with detailed data
+          else if (completion.completion_details) {
+            try {
+              // Parse JSON completion details if it's a string
+              const details = typeof completion.completion_details === 'string' 
+                ? JSON.parse(completion.completion_details) 
+                : completion.completion_details;
+                
+              if (Array.isArray(details)) {
+                // Count correct answers from details
+                const correctFromDetails = details.filter(detail => detail.isCorrect).length;
+                
+                // Each correct answer is worth 10 points
+                const quizPoints = correctFromDetails * 10;
+                totalScore += quizPoints;
+                
+                console.log(`Quiz ${completion.quiz_id} with detailed data: ${correctFromDetails} correct answers, ${quizPoints} points`);
+              }
+            } catch (e) {
+              console.error('Error parsing completion details:', e);
+              // Fall back to calculating from score if parsing fails
+              const correctFromScore = Math.round((completion.score / 100) * totalQuestions);
+              const quizPoints = correctFromScore * 10;
+              totalScore += quizPoints;
+            }
+          }
+          // Fall back to calculating from percentage score
+          else if (completion.score) {
+            // Calculate from percentage score, default to 5 questions if not specified
+            const correctFromScore = Math.round((completion.score / 100) * totalQuestions);
+            
+            const quizPoints = correctFromScore * 10;
+            totalScore += quizPoints;
+            
+            console.log(`Quiz ${completion.quiz_id} score: ${completion.score}%, estimated ${correctFromScore} correct of ${totalQuestions}, ${quizPoints} points`);
+          }
+        });
+        
+        console.log(`User ${user.username} final score: ${totalScore}`);
+        return totalScore;
     }
-
+      
     // Helper function to calculate a user's accuracy
     function calculateAccuracy(user) {
-        // Placeholder for real calculation
-        return Math.floor(Math.random() * 20) + 70;
+        console.log("Calculating accuracy for user:", user.username);
+        
+        // Find this user's quiz history
+        const userQuizData = quizHistory.find(h => h.user_id === user.id);
+        
+        if (!userQuizData || !userQuizData.quiz_completions) {
+          console.log("No quiz completions found for accuracy calculation");
+          return 0;
+        }
+        
+        // Handle different potential data structures for quiz_completions
+        let quizCompletions;
+        if (Array.isArray(userQuizData.quiz_completions)) {
+          quizCompletions = userQuizData.quiz_completions;
+        } else if (typeof userQuizData.quiz_completions === 'object') {
+          // It might be a string that needs parsing
+          try {
+            const parsed = JSON.parse(userQuizData.quiz_completions);
+            quizCompletions = Array.isArray(parsed) ? parsed : null;
+          } catch (e) {
+            // Not a valid JSON string
+            console.error("Failed to parse quiz_completions for accuracy", e);
+            quizCompletions = null;
+          }
+        }
+        
+        if (!quizCompletions || !Array.isArray(quizCompletions) || quizCompletions.length === 0) {
+          console.log("No valid quiz completions array for accuracy calculation");
+          return 0;
+        }
+        
+        // Calculate average score across all quiz attempts
+        let totalScore = 0;
+        let validCompletions = 0;
+        
+        quizCompletions.forEach(completion => {
+          // If the completion has a score, use it directly
+          if (typeof completion.score === 'number') {
+            totalScore += completion.score;
+            validCompletions++;
+            console.log(`Accuracy calculation: quiz score ${completion.score}%`);
+          }
+          // Otherwise try to calculate from completion details
+          else if (completion.completion_details) {
+            try {
+              // Parse JSON completion details if it's a string
+              const details = typeof completion.completion_details === 'string' 
+                ? JSON.parse(completion.completion_details) 
+                : completion.completion_details;
+                
+              if (Array.isArray(details)) {
+                const totalQuestions = details.length;
+                if (totalQuestions > 0) {
+                  const correctAnswers = details.filter(detail => detail.isCorrect).length;
+                  const accuracyPercentage = (correctAnswers / totalQuestions) * 100;
+                  totalScore += accuracyPercentage;
+                  validCompletions++;
+                  console.log(`Accuracy calculation from details: ${accuracyPercentage.toFixed(1)}%`);
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing completion details for accuracy:', e);
+            }
+          }
+          // If we have correct_answers and total_questions, calculate from there
+          else if (completion.correct_answers && completion.total_questions) {
+            const accuracyPercentage = (completion.correct_answers / completion.total_questions) * 100;
+            totalScore += accuracyPercentage;
+            validCompletions++;
+            console.log(`Accuracy calculation from correct_answers: ${accuracyPercentage.toFixed(1)}%`);
+          }
+        });
+        
+        if (validCompletions === 0) return 0;
+        
+        const averageScore = totalScore / validCompletions;
+        console.log(`User ${user.username} accuracy: ${Math.round(averageScore)}%`);
+        return Math.round(averageScore);
     }
-
-    // Get user's current rank
-    const currentUserRank = users.findIndex(user => user.username === currentUsername) + 1;
 
     // Config for users on a page
     const itemsPerPage = 10;
     const totalPages = Math.ceil(users.length / itemsPerPage);
-
-    useEffect(() => {
-        if (currentUserRank > 0) {
-            setCurrentPage(Math.ceil(currentUserRank / itemsPerPage));
-        }
-    }, [currentUserRank]);
 
     // Displayed data based on page
     const displayedData = users.slice(
@@ -233,7 +442,8 @@ const Leaderboard = () => {
                                     <div className="user-column">User</div>
                                     <div className="score-column">Score</div>
                                     <div className="accuracy-column">Accuracy</div>
-                                    <div className="streak-column">Streak</div>
+                                    <div className="login-streak-column">Login Streak</div>
+                                    <div className="quiz-streak-column">Quiz Streak</div>
                                     <div className="details-column"></div>
                                 </div>
                                 
@@ -250,28 +460,45 @@ const Leaderboard = () => {
                                             <FontAwesomeIcon icon={faCircleUser} className="user-avatar" />
                                             <span className="username">{user.username}</span>
                                         </div>
-                                        <div className="score-column">{user.score.toLocaleString()}</div>
+                                        <div className="score-column">{user.score}</div>
                                         <div className="accuracy-column">{user.accuracy}%</div>
-                                        
-                                        <div className="streak-column tooltip-container">
-                                            <FontAwesomeIcon icon={faFireFlameSimple} className="streak-icon" />
+                                        <div className="login-streak-column tooltip-container">
+                                            <FontAwesomeIcon icon={faCalendarCheck} className="streak-icon login-streak-icon" />
                                             <span className="streak-value">
-                                                {user.combinedStreak} {user.combinedStreak === 1 ? 'day' : 'days'}
+                                                {user.loginStreak} {user.loginStreak === 1 ? 'day' : 'days'}
                                             </span>
                                             
                                             <div className="tooltip">
-                                                <p className="tooltip-title">Streak Details</p>
+                                                <p className="tooltip-title">Login Streak</p>
                                                 <p>
-                                                    <span className="tooltip-label">Login Streak:</span> 
+                                                    <span className="tooltip-label">Current:</span> 
                                                     {user.loginStreak} days
                                                 </p>
                                                 <p>
-                                                    <span className="tooltip-label">Quiz Streak:</span> 
-                                                    {user.quizStreak} days
+                                                    <span className="tooltip-label">Longest:</span> 
+                                                    {user.longestLoginStreak} days
                                                 </p>
-                                                <p><span className="tooltip-label">Combined:</span> {user.combinedStreak} days</p>
                                                 <div className="tooltip-divider"></div>
                                                 <p><span className="tooltip-label">Last Login:</span> {formatTimeAgo(user.lastLogin)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="quiz-streak-column tooltip-container">
+                                            <FontAwesomeIcon icon={faQuestionCircle} className="streak-icon quiz-streak-icon" />
+                                            <span className="streak-value">
+                                                {user.quizStreak} {user.quizStreak === 1 ? 'day' : 'days'}
+                                            </span>
+                                            
+                                            <div className="tooltip">
+                                                <p className="tooltip-title">Quiz Streak</p>
+                                                <p>
+                                                    <span className="tooltip-label">Current:</span> 
+                                                    {user.quizStreak} quizes completed
+                                                </p>
+                                                <p>
+                                                    <span className="tooltip-label">Longest:</span> 
+                                                    {user.longestQuizStreak} days
+                                                </p>
+                                                <div className="tooltip-divider"></div>
                                                 <p><span className="tooltip-label">Last Quiz:</span> {formatTimeAgo(user.lastQuizUpdate)}</p>
                                             </div>
                                         </div>
@@ -290,7 +517,11 @@ const Leaderboard = () => {
                                             <div className="expanded-details">
                                                 <div className="details-grid">
                                                     <div className="detail-item">
-                                                        <span className="detail-label">Challenges Completed</span>
+                                                        <span className="detail-label">Total Quiz Completions</span>
+                                                        <span className="detail-value">{user.totalCompletions}</span>
+                                                    </div>
+                                                    <div className="detail-item">
+                                                        <span className="detail-label">Unique Quiz Days</span>
                                                         <span className="detail-value">{user.completedChallenges}</span>
                                                     </div>
                                                     <div className="detail-item">
@@ -299,7 +530,7 @@ const Leaderboard = () => {
                                                     </div>
                                                     <div className="detail-item">
                                                         <span className="detail-label">Quiz Streak</span>
-                                                        <span className="detail-value">{user.quizStreak} days</span>
+                                                        <span className="detail-value">{user.quizStreak} </span>
                                                     </div>
                                                     <div className="detail-item">
                                                         <span className="detail-label">Longest Login Streak</span>
@@ -307,7 +538,7 @@ const Leaderboard = () => {
                                                     </div>
                                                     <div className="detail-item">
                                                         <span className="detail-label">Longest Quiz Streak</span>
-                                                        <span className="detail-value">{user.longestQuizStreak} days</span>
+                                                        <span className="detail-value">{user.longestQuizStreak} </span>
                                                     </div>
                                                     <div className="detail-item">
                                                         <span className="detail-label">Last Active</span>
@@ -341,28 +572,47 @@ const Leaderboard = () => {
                                                         <FontAwesomeIcon icon={faCircleUser} className="user-avatar" />
                                                         <span className="username">{user.username}</span>
                                                     </div>
-                                                    <div className="score-column">{user.score.toLocaleString()}</div>
+                                                    <div className="score-column">{user.score}</div>
                                                     <div className="accuracy-column">{user.accuracy}%</div>
                                                     
-                                                    <div className="streak-column tooltip-container">
-                                                        <FontAwesomeIcon icon={faFireFlameSimple} className="streak-icon" />
+                                                    <div className="login-streak-column tooltip-container">
+                                                        <FontAwesomeIcon icon={faCalendarCheck} className="streak-icon login-streak-icon" />
                                                         <span className="streak-value">
-                                                            {user.combinedStreak} {user.combinedStreak === 1 ? 'day' : 'days'}
+                                                            {user.loginStreak} {user.loginStreak === 1 ? 'day' : 'days'}
                                                         </span>
                                                         
                                                         <div className="tooltip">
-                                                            <p className="tooltip-title">Streak Details</p>
+                                                            <p className="tooltip-title">Login Streak</p>
                                                             <p>
-                                                                <span className="tooltip-label">Login Streak:</span> 
+                                                                <span className="tooltip-label">Current:</span> 
                                                                 {user.loginStreak} days
                                                             </p>
                                                             <p>
-                                                                <span className="tooltip-label">Quiz Streak:</span> 
-                                                                {user.quizStreak} days
+                                                                <span className="tooltip-label">Longest:</span> 
+                                                                {user.longestLoginStreak} days
                                                             </p>
-                                                            <p><span className="tooltip-label">Combined:</span> {user.combinedStreak} days</p>
                                                             <div className="tooltip-divider"></div>
                                                             <p><span className="tooltip-label">Last Login:</span> {formatTimeAgo(user.lastLogin)}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="quiz-streak-column tooltip-container">
+                                                        <FontAwesomeIcon icon={faQuestionCircle} className="streak-icon quiz-streak-icon" />
+                                                        <span className="streak-value">
+                                                            {user.quizStreak} {user.quizStreak === 1 ? 'day' : 'days'}
+                                                        </span>
+                                                        
+                                                        <div className="tooltip">
+                                                            <p className="tooltip-title">Quiz Streak</p>
+                                                            <p>
+                                                                <span className="tooltip-label">Current:</span> 
+                                                                {user.quizStreak} 
+                                                            </p>
+                                                            <p>
+                                                                <span className="tooltip-label">Longest:</span> 
+                                                                {user.longestQuizStreak} days
+                                                            </p>
+                                                            <div className="tooltip-divider"></div>
                                                             <p><span className="tooltip-label">Last Quiz:</span> {formatTimeAgo(user.lastQuizUpdate)}</p>
                                                         </div>
                                                     </div>
@@ -381,7 +631,11 @@ const Leaderboard = () => {
                                                         <div className="expanded-details">
                                                             <div className="details-grid">
                                                                 <div className="detail-item">
-                                                                    <span className="detail-label">Challenges Completed</span>
+                                                                    <span className="detail-label">Total Quiz Completions</span>
+                                                                    <span className="detail-value">{user.totalCompletions}</span>
+                                                                </div>
+                                                                <div className="detail-item">
+                                                                    <span className="detail-label">Unique Quiz Days</span>
                                                                     <span className="detail-value">{user.completedChallenges}</span>
                                                                 </div>
                                                                 <div className="detail-item">
@@ -390,7 +644,7 @@ const Leaderboard = () => {
                                                                 </div>
                                                                 <div className="detail-item">
                                                                     <span className="detail-label">Quiz Streak</span>
-                                                                    <span className="detail-value">{user.quizStreak} days</span>
+                                                                    <span className="detail-value">{user.quizStreak} </span>
                                                                 </div>
                                                                 <div className="detail-item">
                                                                     <span className="detail-label">Longest Login Streak</span>
@@ -448,19 +702,23 @@ const Leaderboard = () => {
                     )}
                 </div>
                 
-                {/* Streak information card */}
+                {/* Scoring information card */}
                 <div className="streak-info-card">
-                    <h3><FontAwesomeIcon icon={faInfoCircle} /> Streak Information</h3>
-                    <p>Streaks are updated based on your activity:</p>
+                    <h3><FontAwesomeIcon icon={faInfoCircle} /> Scoring Information</h3>
+                    <p>The leaderboard displays two types of streaks:</p>
                     <ul>
                         <li><strong>Login Streak:</strong> Increases each day you log in, resets after 24 hours of inactivity</li>
                         <li><strong>Quiz Streak:</strong> Increases each day you complete at least one quiz, resets after 24 hours of inactivity</li>
-                        <li><strong>Combined Streak:</strong> The sum of your login and quiz streaks</li>
+                    </ul>
+                    <p>Your score is based on:</p>
+                    <ul>
+                        <li>Every correct question is worth 10 points</li>
+                        <li>Your score is the sum of all points earned across all quiz completions</li>
+                        <li>Accuracy shows your average score across all quizzes</li>
                     </ul>
                 </div>
             </div>
             
-            {/* Add your existing CSS styles here */}
             <style jsx>{`
                 .leaderboard-container {
                     max-width: 1200px;
@@ -492,7 +750,7 @@ const Leaderboard = () => {
                 
                 .leaderboard-table-header {
                     display: grid;
-                    grid-template-columns: 0.5fr 2fr 1fr 1fr 1fr 0.5fr;
+                    grid-template-columns: 0.5fr 2fr 1fr 1fr 1fr 1fr 0.5fr;
                     padding: 1rem;
                     background-color: #2c3e50;
                     border-radius: 8px;
@@ -503,7 +761,7 @@ const Leaderboard = () => {
                 
                 .leaderboard-row {
                     display: grid;
-                    grid-template-columns: 0.5fr 2fr 1fr 1fr 1fr 0.5fr;
+                    grid-template-columns: 0.5fr 2fr 1fr 1fr 1fr 1fr 0.5fr;
                     padding: 1rem;
                     border-radius: 8px;
                     margin-bottom: 0.5rem;
@@ -538,7 +796,7 @@ const Leaderboard = () => {
                     border: 1px solid #3498db;
                 }
                 
-                .rank-column, .user-column, .score-column, .accuracy-column, .streak-column, .details-column {
+                .rank-column, .user-column, .score-column, .accuracy-column, .login-streak-column, .quiz-streak-column, .details-column {
                     display: flex;
                     align-items: center;
                 }
@@ -580,7 +838,7 @@ const Leaderboard = () => {
                     font-weight: 500;
                 }
                 
-                .streak-column {
+                .login-streak-column, .quiz-streak-column {
                     display: flex;
                     align-items: center;
                     gap: 8px;
@@ -589,7 +847,11 @@ const Leaderboard = () => {
                     position: relative;
                 }
                 
-                .streak-icon {
+                .login-streak-icon {
+                    color: #3498db;
+                }
+                
+                .quiz-streak-icon {
                     color: #e74c3c;
                 }
                 
@@ -870,7 +1132,7 @@ const Leaderboard = () => {
                 @media (max-width: 992px) {
                     .leaderboard-table-header, 
                     .leaderboard-row {
-                        grid-template-columns: 0.5fr 2fr 1fr 1fr 0.5fr;
+                        grid-template-columns: 0.5fr 2fr 1fr 1fr 1fr 0.5fr;
                     }
                     
                     .accuracy-column {
@@ -889,12 +1151,12 @@ const Leaderboard = () => {
                     
                     .leaderboard-table-header, 
                     .leaderboard-row {
-                        grid-template-columns: 0.5fr 2fr 1fr 0.5fr;
+                        grid-template-columns: 0.5fr 2fr 1fr 1fr 0.5fr;
                         padding: 0.75rem;
                         font-size: 0.9rem;
                     }
                     
-                    .streak-column {
+                    .quiz-streak-column {
                         display: none;
                     }
                     
@@ -906,11 +1168,11 @@ const Leaderboard = () => {
                 @media (max-width: 576px) {
                     .leaderboard-table-header, 
                     .leaderboard-row {
-                        grid-template-columns: 0.5fr 2fr 0.5fr;
+                        grid-template-columns: 0.5fr 2fr 1fr 0.5fr;
                         font-size: 0.85rem;
                     }
                     
-                    .score-column {
+                    .login-streak-column {
                         display: none;
                     }
                     

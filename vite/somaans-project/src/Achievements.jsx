@@ -7,7 +7,11 @@ import {
   faStar, 
   faCalendarCheck,
   faExclamationTriangle,
-  faSpinner
+  faSpinner,
+  faAward,
+  faGraduationCap,
+  faCertificate,
+  faCheck
 } from '@fortawesome/free-solid-svg-icons';
 import { API_ENDPOINTS } from './constants';
 import { toast } from 'react-toastify';
@@ -51,8 +55,25 @@ const Achievements = () => {
     fetchAchievements();
   }, [userId]);
 
-  // Helper function to get icon based on achievement title
+  // Helper function to get icon based on achievement title or icon property
   const getIconForAchievement = (achievement) => {
+    // If the achievement has an icon property, use it
+    if (achievement.icon) {
+      switch (achievement.icon.toLowerCase()) {
+        case 'star': return faStar;
+        case 'shield': return faShield;
+        case 'calendar-check': return faCalendarCheck;
+        case 'trophy': return faTrophy;
+        case 'medal': return faMedal;
+        case 'award': return faAward;
+        case 'certificate': return faCertificate;
+        case 'graduation-cap': return faGraduationCap;
+        case 'check': return faCheck;
+        default: return faStar;
+      }
+    }
+    
+    // Otherwise, try to determine icon from title
     if (achievement.title.includes('Star') || achievement.title.includes('Learner')) {
       return faStar;
     } else if (achievement.title.includes('Champion') || achievement.title.includes('Security')) {
@@ -112,7 +133,7 @@ const Achievements = () => {
       <div className="achievements-container">
         <div className="achievements-header">
           <h2>Let's see what achievements you've received, {username}</h2>
-          <h3>As you complete quizzes, you will be able to see view your achievements here.</h3>
+          <h3>As you complete quizzes, you will be able to view your achievements here.</h3>
         </div>
         
         <div className="achievements-grid">
@@ -121,7 +142,7 @@ const Achievements = () => {
               <div key={achievement.id} className="achievement-card">
                 <div 
                   className={`achievement-icon ${!achievement.unlocked && 'locked'}`}
-                  style={{backgroundColor: achievement.unlocked ? achievement.color : '#ccc'}}
+                  style={{backgroundColor: achievement.unlocked ? achievement.color || '#646cff' : '#ccc'}}
                 >
                   <FontAwesomeIcon icon={getIconForAchievement(achievement)} />
                 </div>
@@ -131,7 +152,9 @@ const Achievements = () => {
                   <p>{achievement.description}</p>
                   
                   {achievement.unlocked ? (
-                    <div className="achievement-unlocked">Unlocked!</div>
+                    <div className="achievement-unlocked">
+                      <FontAwesomeIcon icon={faCheck} className="check-icon" /> Unlocked!
+                    </div>
                   ) : (
                     <div className="achievement-progress">
                       <div className="progress-bar">
@@ -239,6 +262,11 @@ const Achievements = () => {
           font-weight: bold;
           display: flex;
           align-items: center;
+          gap: 6px;
+        }
+        
+        .check-icon {
+          font-size: 0.9rem;
         }
         
         .achievement-progress {
