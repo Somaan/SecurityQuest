@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faMedal, 
   faSpinner, 
   faExclamationTriangle,
   faCalendarCheck,
   faQuestionCircle,
+  faInfoCircle,
+  faListAlt,
   faTrophy,
   faChartLine,
+  faCalendarAlt,
   faCheckCircle,
   faTimesCircle,
-  faInfoCircle,
-  faListAlt
+  faArrowUp,
+  faArrowDown
 } from '@fortawesome/free-solid-svg-icons';
 import { API_ENDPOINTS } from './constants';
 import { toast } from 'react-toastify';
@@ -26,19 +28,16 @@ const Statistics = () => {
   const [quizHistory, setQuizHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Track window width for responsive chart
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   
+  // Statistics tabs
+  const [activeTab, setActiveTab] = useState('overview');
+  
+  // Window resize handler for responsive design
   useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-    
+    const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
   
   // Fetch user data
@@ -46,7 +45,7 @@ const Statistics = () => {
     const fetchUserStats = async () => {
       setLoading(true);
       try {
-        // Fetch user streaks
+        // Fetch user streaks and quiz history
         const response = await fetch(API_ENDPOINTS.GET_USER_STREAKS.replace(':userId', userId));
         if (!response.ok) {
           throw new Error('Failed to fetch user statistics');
@@ -58,7 +57,6 @@ const Statistics = () => {
         setUserData(data.userData || {});
         setQuizHistory(data.quizHistory || []);
         
-        // Log the number of quiz completions
         console.log(`Loaded ${data.quizHistory?.length || 0} quiz completions for user ${userId}`);
       } catch (err) {
         console.error('Error fetching user statistics:', err);
@@ -72,18 +70,22 @@ const Statistics = () => {
     fetchUserStats();
   }, [userId]);
   
-  // Determine chart width based on screen size
+  // Chart dimensions calculations
   const getChartWidth = () => {
     if (windowWidth <= 480) return 280;
     if (windowWidth <= 768) return 400;
-    return 500;
+    return 600;
+  };
+  
+  const getChartHeight = () => {
+    if (windowWidth <= 480) return 140;
+    return 200;
   };
 
-  // Calculate score data for line chart from quiz history - use ALL completions
+  // Calculate score data for line chart from quiz history
   const calculateScoreData = () => {
     if (!quizHistory || quizHistory.length === 0) {
-      // Default placeholder data
-      return [65, 75, 36, 52, 74, 90];
+      return { scores: [], labels: [] };
     }
     
     // Sort by date
@@ -91,51 +93,98 @@ const Statistics = () => {
       new Date(a.completion_date || a.date) - new Date(b.completion_date || b.date)
     );
     
-    // Take the most recent 6 entries (or fewer if not available)
-    // This now correctly uses ALL completions, not just one per day
-    const recentEntries = sortedHistory.slice(-6);
+    // Take all entries, max 10 most recent
+    const recentEntries = sortedHistory.slice(-10);
     
-    // Map to scores
-    return recentEntries.map(entry => entry.score);
+    // Map to scores and date labels
+    return {
+      scores: recentEntries.map(entry => entry.score),
+      labels: recentEntries.map(entry => {
+        const date = new Date(entry.completion_date || entry.date);
+        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth()+1).toString().padStart(2, '0')}`;
+      })
+    };
   };
 
-  // Creating points for chart
-  const scoreData = calculateScoreData();
-  const chartWidth = getChartWidth();
-  const chartHeight = 100;
-  const xStep = chartWidth / (scoreData.length - 1 || 1); // Avoid division by zero
-  const maxScore = 100;
-  const points = scoreData.length > 1 
-    ? scoreData.map((score, index) => {
-        const x = index * xStep;
-        const y = chartHeight - (score / maxScore) * chartHeight;
-        return `${x},${y}`;
-      }).join(' ')
-    : `0,${chartHeight - (scoreData[0] / maxScore) * chartHeight} ${chartWidth},${chartHeight - (scoreData[0] / maxScore) * chartHeight}`;
-
-  // Calculate average score - use ALL completions
-  const calculateAverageScore = () => {
-    if (!quizHistory || quizHistory.length === 0) return 0;
+  // Format date function - using DD/MM format (not US format)
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'Unknown date';
+    try {
+      const date = new Date(dateStr);
+      return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return 'Invalid date';
+    }
+  };
+  
+  // Format time ago
+  const formatTimeAgo = (dateStr) => {
+    if (!dateStr) return 'Never';
     
-    const sum = quizHistory.reduce((total, quiz) => total + quiz.score, 0);
-    return Math.round(sum / quizHistory.length);
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+    }
+    return formatDate(dateStr);
+  };
+
+  // Calculate statistics
+  const calculateStats = () => {
+    const stats = {
+      totalCompletions: quizHistory.length,
+      uniqueDays: userData?.quiz_days_count || 0,
+      beginner: quizHistory.filter(q => q.quiz_id === 1).length,
+      intermediate: quizHistory.filter(q => q.quiz_id === 2).length,
+      advanced: quizHistory.filter(q => q.quiz_id === 3).length,
+      averageScore: 0,
+      highestScore: 0,
+      lowestScore: 100,
+      passRate: 0,
+      beginnerHighest: calculateModuleProgress('beginner'),
+      intermediateHighest: calculateModuleProgress('intermediate'),
+      advancedHighest: calculateModuleProgress('advanced'),
+      recentQuizzes: []
+    };
+    
+    // Calculate average, highest, and lowest scores
+    if (quizHistory.length > 0) {
+      const scores = quizHistory.map(q => q.score);
+      stats.averageScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+      stats.highestScore = Math.max(...scores);
+      stats.lowestScore = Math.min(...scores);
+      stats.passRate = Math.round((quizHistory.filter(q => q.score >= 70).length / quizHistory.length) * 100);
+      
+      // Get recent quizzes
+      stats.recentQuizzes = [...quizHistory]
+        .sort((a, b) => new Date(b.completion_date || b.date) - new Date(a.completion_date || a.date))
+        .slice(0, 5);
+    }
+    
+    return stats;
   };
   
   // Calculate module progress
   const calculateModuleProgress = (difficulty) => {
     if (!quizHistory || quizHistory.length === 0) return 0;
     
-    // Find quizzes for this difficulty
     const quizId = difficulty === 'beginner' ? 1 : (difficulty === 'intermediate' ? 2 : 3);
     const matchingQuizzes = quizHistory.filter(quiz => quiz.quiz_id === quizId);
     
     if (matchingQuizzes.length === 0) return 0;
     
     // Find highest score from ALL completions
-    const highestScore = Math.max(...matchingQuizzes.map(quiz => quiz.score));
-    return highestScore;
+    return Math.max(...matchingQuizzes.map(quiz => quiz.score));
   };
-
+  
   // Calculate difficulty specific stats
   const calculateDifficultyStats = (difficulty) => {
     const quizId = difficulty === 'beginner' ? 1 : (difficulty === 'intermediate' ? 2 : 3);
@@ -146,29 +195,38 @@ const Statistics = () => {
         attempts: 0, 
         highestScore: 0, 
         averageScore: 0,
-        passRate: 0
+        passRate: 0,
+        recentScore: null,
+        trend: 'neutral'
       };
     }
     
     const attempts = matchingQuizzes.length;
-    const highestScore = Math.max(...matchingQuizzes.map(quiz => quiz.score));
-    const averageScore = Math.round(matchingQuizzes.reduce((sum, quiz) => sum + quiz.score, 0) / attempts);
+    const scores = matchingQuizzes.map(q => q.score);
+    const highestScore = Math.max(...scores);
+    const averageScore = Math.round(scores.reduce((a, b) => a + b, 0) / attempts);
     const passedAttempts = matchingQuizzes.filter(quiz => quiz.score >= 70).length;
     const passRate = Math.round((passedAttempts / attempts) * 100);
     
-    return { attempts, highestScore, averageScore, passRate };
-  };
-
-  // Format date function
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'Unknown date';
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleString();
-    } catch (e) {
-      console.error('Error formatting date:', e);
-      return 'Invalid date';
+    // Get trend direction by comparing most recent scores
+    const sortedQuizzes = [...matchingQuizzes].sort((a, b) => 
+      new Date(b.completion_date || b.date) - new Date(a.completion_date || a.date)
+    );
+    
+    let trend = 'neutral';
+    let recentScore = null;
+    
+    if (sortedQuizzes.length > 0) {
+      recentScore = sortedQuizzes[0].score;
+      
+      if (sortedQuizzes.length > 1) {
+        const previousScore = sortedQuizzes[1].score;
+        if (recentScore > previousScore) trend = 'up';
+        else if (recentScore < previousScore) trend = 'down';
+      }
     }
+    
+    return { attempts, highestScore, averageScore, passRate, recentScore, trend };
   };
 
   if (loading) {
@@ -196,575 +254,1279 @@ const Statistics = () => {
       </div>
     );
   }
-
+  
+  // Calculate all statistics
+  const stats = calculateStats();
+  const scoreData = calculateScoreData();
+  const chartWidth = getChartWidth();
+  const chartHeight = getChartHeight();
   const beginnerStats = calculateDifficultyStats('beginner');
   const intermediateStats = calculateDifficultyStats('intermediate');
   const advancedStats = calculateDifficultyStats('advanced');
   
-  // Get total quiz completions count
-  const totalQuizCompletions = userData?.total_quizzes || quizHistory.length || 0;
-
+  // SVG points calculation for the line chart
+  const maxScore = 100;
+  const xStep = chartWidth / (Math.max(scoreData.scores.length - 1, 1));
+  
+  // Generate points string for SVG polyline
+  const points = scoreData.scores.map((score, index) => {
+    const x = index * xStep;
+    const y = chartHeight - (score / maxScore) * chartHeight;
+    return `${x},${y}`;
+  }).join(' ');
+  
   return (
     <div className="content-wrapper">
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <h2>Let's see how well you are doing, {username}</h2>
+      <div className="statistics-container">
+        <div className="statistics-header">
+          <h2>Statistics Dashboard</h2>
+          <p className="statistics-subtitle">Track your progress and improvement over time</p>
         </div>
         
-        <div className="statistics-grid">
-          {/* Score History Card */}
-          <div className="statistics-card score-history-card">
-            <h3>Score History</h3>
-            {quizHistory.length > 0 ? (
-              <div className="chart-container">
-                <svg width={chartWidth} height={chartHeight} className="line-chart">
-                  {/* Grid Lines */}
-                  <line x1="0" y1="0" x2={chartWidth} y2="0" stroke="#444" strokeDasharray="2"/>
-                  <line x1="0" y1={chartHeight/2} x2={chartWidth} y2={chartHeight/2} stroke="#444" strokeDasharray="2" />
-                  <line x1="0" y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke="#444" strokeDasharray="2" />
+        {/* Tab selection for statistics views */}
+        <div className="statistics-tabs">
+          <button 
+            className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            <FontAwesomeIcon icon={faChartLine} className="tab-icon" />
+            Overview
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'quizzes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('quizzes')}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} className="tab-icon" />
+            Quiz Details
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'streaks' ? 'active' : ''}`}
+            onClick={() => setActiveTab('streaks')}
+          >
+            <FontAwesomeIcon icon={faCalendarCheck} className="tab-icon" />
+            Streaks
+          </button>
+        </div>
+        
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="statistics-tab-content">
+            <div className="stats-grid overview-grid">
+              {/* Score Metrics Card */}
+              <div className="stats-card score-metrics">
+                <h3 className="card-title">Score Metrics</h3>
+                <div className="metrics-grid">
+                  <div className="metric-item">
+                    <div className="metric-icon average-icon">
+                      <FontAwesomeIcon icon={faChartLine} />
+                    </div>
+                    <div className="metric-content">
+                      <span className="metric-label">Average Score</span>
+                      <span className="metric-value">{stats.averageScore}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="metric-item">
+                    <div className="metric-icon highest-icon">
+                      <FontAwesomeIcon icon={faArrowUp} />
+                    </div>
+                    <div className="metric-content">
+                      <span className="metric-label">Highest Score</span>
+                      <span className="metric-value">{stats.highestScore}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="metric-item">
+                    <div className="metric-icon lowest-icon">
+                      <FontAwesomeIcon icon={faArrowDown} />
+                    </div>
+                    <div className="metric-content">
+                      <span className="metric-label">Lowest Score</span>
+                      <span className="metric-value">{stats.lowestScore}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="metric-item">
+                    <div className="metric-icon pass-icon">
+                      <FontAwesomeIcon icon={faCheckCircle} />
+                    </div>
+                    <div className="metric-content">
+                      <span className="metric-label">Pass Rate</span>
+                      <span className="metric-value">{stats.passRate}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Score History Card - Improved chart with labels */}
+              <div className="stats-card score-history-card">
+                <h3 className="card-title">Quiz Score History</h3>
+                
+                {scoreData.scores.length > 0 ? (
+                  <div className="score-chart-container">
+                    <div className="y-axis-labels">
+                      <span>100%</span>
+                      <span>75%</span>
+                      <span>50%</span>
+                      <span>25%</span>
+                      <span>0%</span>
+                    </div>
+                    
+                    <div className="chart-area">
+                      <svg width={chartWidth} height={chartHeight} className="score-chart">
+                        {/* Grid lines */}
+                        <line x1="0" y1="0" x2={chartWidth} y2="0" stroke="#444" strokeDasharray="2"/>
+                        <line x1="0" y1={chartHeight/4} x2={chartWidth} y2={chartHeight/4} stroke="#444" strokeDasharray="2" />
+                        <line x1="0" y1={chartHeight/2} x2={chartWidth} y2={chartHeight/2} stroke="#444" strokeDasharray="2" />
+                        <line x1="0" y1={chartHeight*3/4} x2={chartWidth} y2={chartHeight*3/4} stroke="#444" strokeDasharray="2" />
+                        <line x1="0" y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke="#444" strokeDasharray="2" />
+                        
+                        {/* Pass threshold line (70%) */}
+                        <line 
+                          x1="0" 
+                          y1={chartHeight - (70/maxScore) * chartHeight} 
+                          x2={chartWidth} 
+                          y2={chartHeight - (70/maxScore) * chartHeight} 
+                          stroke="#e67e22" 
+                          strokeWidth="1.5"
+                          strokeDasharray="5,3"
+                        />
+                        <text 
+                          x="5" 
+                          y={chartHeight - (70/maxScore) * chartHeight - 5} 
+                          fill="#e67e22" 
+                          fontSize="10"
+                        >
+                          Pass threshold (70%)
+                        </text>
 
-                  {/* Line chart */}
-                  <polyline
-                    fill="none"
-                    stroke="#646cff"
-                    strokeWidth="2"
-                    points={points}
-                  />
+                        {/* Main score line */}
+                        <polyline
+                          fill="none"
+                          stroke="#646cff"
+                          strokeWidth="3"
+                          points={points}
+                        />
 
-                  {/* Points for each data point */}
-                  {scoreData.map((score, index) => {
-                    const x = index * xStep;
-                    const y = chartHeight - (score / maxScore) * chartHeight;
-                    return (
-                      <circle
-                        key={index}
-                        cx={x}
-                        cy={y}
-                        r="3"
-                        fill="#646cff"
-                      />
-                    );
-                  })}
-                </svg>
-              </div>
-            ) : (
-              <div className="no-data-message">
-                <FontAwesomeIcon icon={faInfoCircle} className="info-icon" />
-                <p>Complete quizzes to see your score history</p>
-              </div>
-            )}
-          </div>
-
-          {/* Module Progress */}
-          <div className="statistics-card module-progress-card">
-            <h3>Module Progress</h3>
-            <div className="module-progress-item">
-              <p>Beginner - {calculateModuleProgress('beginner')}%</p>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{width: `${calculateModuleProgress('beginner')}%` }}></div>
-              </div>
-            </div>
-            <div className="module-progress-item">
-              <p>Intermediate - {calculateModuleProgress('intermediate')}%</p>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{width: `${calculateModuleProgress('intermediate')}%` }}></div>
-              </div>
-            </div>
-            <div className="module-progress-item">
-              <p>Advanced - {calculateModuleProgress('advanced')}%</p>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{width: `${calculateModuleProgress('advanced')}%` }}></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Accuracy Card */}
-          <div className="statistics-card accuracy-card">
-            <h3>Average Score</h3>
-            <div className="accuracy-circle">
-              <div className="progress-circle" style={{
-                background: `conic-gradient(#646cff ${calculateAverageScore() * 3.6}deg, #333 0)`
-              }}>
-                <div className="progress-circle-inner">
-                  <span className="progress-percentage">{calculateAverageScore()}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quiz Completion Statistics */}
-          <div className="statistics-card completion-stats-card">
-            <h3>Quiz Completions</h3>
-            <div className="completion-stats-grid">
-              <div className="stat-item">
-                <span className="stat-label">Total Completions</span>
-                <span className="stat-value">{totalQuizCompletions}</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-label">Unique Quiz Days</span>
-                <span className="stat-value">{userData?.quiz_days_count || 0}</span>
-              </div>
-              <div className="stat-item">
-                <div className="stat-icon beginner-icon">
-                  <FontAwesomeIcon icon={faListAlt} />
-                </div>
-                <span className="stat-label">Beginner Quizzes</span>
-                <span className="stat-value">{userData?.difficulty_counts?.[1] || quizHistory.filter(q => q.quiz_id === 1).length}</span>
-              </div>
-              <div className="stat-item">
-                <div className="stat-icon intermediate-icon">
-                  <FontAwesomeIcon icon={faListAlt} />
-                </div>
-                <span className="stat-label">Intermediate Quizzes</span>
-                <span className="stat-value">{userData?.difficulty_counts?.[2] || quizHistory.filter(q => q.quiz_id === 2).length}</span>
-              </div>
-              <div className="stat-item">
-                <div className="stat-icon advanced-icon">
-                  <FontAwesomeIcon icon={faListAlt} />
-                </div>
-                <span className="stat-label">Advanced Quizzes</span>
-                <span className="stat-value">{userData?.difficulty_counts?.[3] || quizHistory.filter(q => q.quiz_id === 3).length}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Current Streak */}
-          <div className="statistics-card streak-card">
-            <h3>Streak Information</h3>
-            <div className="streaks-container">
-              <div className="streak-item">
-                <div className="streak-icon-container">
-                  <FontAwesomeIcon icon={faCalendarCheck} className="streak-icon" />
-                </div>
-                <div className="streak-info">
-                  <p className="streak-label">Login Streak (consecutive days)</p>
-                  <p className="streak-value">{userData?.login_streak || 0} {userData?.login_streak === 1 ? 'day' : 'days'}</p>
-                </div>
-              </div>
-              <div className="streak-item">
-                <div className="streak-icon-container">
-                  <FontAwesomeIcon icon={faCalendarCheck} className="streak-icon" />
-                </div>
-                <div className="streak-info">
-                  <p className="streak-label">Longest Login Streak</p>
-                  <p className="streak-value">{userData?.longest_login_streak || 0} {userData?.longest_login_streak === 1 ? 'day' : 'days'}</p>
-                </div>
-              </div>
-              <div className="streak-item">
-                <div className="streak-icon-container">
-                  <FontAwesomeIcon icon={faQuestionCircle} className="streak-icon" />
-                </div>
-                <div className="streak-info">
-                  <p className="streak-label">Quiz Streak (consecutive days)</p>
-                  <p className="streak-value">{userData?.quiz_streak || 0} {userData?.quiz_streak === 1 ? 'day' : 'days'}</p>
-                </div>
-              </div>
-              <div className="streak-item">
-                <div className="streak-icon-container">
-                  <FontAwesomeIcon icon={faQuestionCircle} className="streak-icon" />
-                </div>
-                <div className="streak-info">
-                  <p className="streak-label">Longest Quiz Streak</p>
-                  <p className="streak-value">{userData?.longest_quiz_streak || 0} {userData?.longest_quiz_streak === 1 ? 'day' : 'days'}</p>
-                </div>
-              </div>
-            </div>
-            <div className="streak-info-box">
-              <FontAwesomeIcon icon={faInfoCircle} className="info-icon" />
-              <p>Streaks measure consecutive days of activity. For example, a quiz streak of 3 means you've completed at least one quiz per day for the last 3 days.</p>
-            </div>
-          </div>
-          
-          {/* Difficulty Stats Cards */}
-          <div className="statistics-card difficulty-card beginner-difficulty">
-            <h3>Beginner Level Stats</h3>
-            {beginnerStats.attempts > 0 ? (
-              <div className="difficulty-stats">
-                <div className="stat-row">
-                  <div className="stat-box">
-                    <span className="stat-title">Attempts</span>
-                    <span className="stat-value">{beginnerStats.attempts}</span>
-                  </div>
-                  <div className="stat-box">
-                    <span className="stat-title">Average Score</span>
-                    <span className="stat-value">{beginnerStats.averageScore}%</span>
-                  </div>
-                </div>
-                <div className="stat-row">
-                  <div className="stat-box">
-                    <span className="stat-title">Highest</span>
-                    <span className="stat-value">{beginnerStats.highestScore}%</span>
-                  </div>
-                  <div className="stat-box">
-                    <span className="stat-title">Pass Rate</span>
-                    <span className="stat-value">{beginnerStats.passRate}%</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="no-attempts">
-                <p>No beginner quizzes completed yet</p>
-              </div>
-            )}
-          </div>
-          
-          <div className="statistics-card difficulty-card intermediate-difficulty">
-            <h3>Intermediate Level Stats</h3>
-            {intermediateStats.attempts > 0 ? (
-              <div className="difficulty-stats">
-                <div className="stat-row">
-                  <div className="stat-box">
-                    <span className="stat-title">Attempts</span>
-                    <span className="stat-value">{intermediateStats.attempts}</span>
-                  </div>
-                  <div className="stat-box">
-                    <span className="stat-title">Average Score</span>
-                    <span className="stat-value">{intermediateStats.averageScore}%</span>
-                  </div>
-                </div>
-                <div className="stat-row">
-                  <div className="stat-box">
-                    <span className="stat-title">Highest</span>
-                    <span className="stat-value">{intermediateStats.highestScore}%</span>
-                  </div>
-                  <div className="stat-box">
-                    <span className="stat-title">Pass Rate</span>
-                    <span className="stat-value">{intermediateStats.passRate}%</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="no-attempts">
-                <p>No intermediate quizzes completed yet</p>
-              </div>
-            )}
-          </div>
-          
-          {/* Recent Quiz Completions Card */}
-          <div className="statistics-card completions-card">
-            <h3>Recent Quiz Completions</h3>
-            <div className="completions-list">
-              {quizHistory.length > 0 ? (
-                quizHistory
-                  .sort((a, b) => new Date(b.completion_date || b.date) - new Date(a.completion_date || a.date))
-                  .slice(0, 5)
-                  .map((quiz, index) => (
-                    <div key={index} className="completion-item">
-                      <div className="completion-date">
-                        {formatDate(quiz.completion_date || quiz.date)}
-                      </div>
-                      <div className="completion-info">
-                        <span className="difficulty">{getDifficultyName(quiz.quiz_id)}</span>
-                        <span className="score">
-                          Score: {quiz.score}%
-                          {quiz.score >= 70 ? (
-                            <FontAwesomeIcon icon={faCheckCircle} className="pass-icon" />
-                          ) : (
-                            <FontAwesomeIcon icon={faTimesCircle} className="fail-icon" />
-                          )}
-                        </span>
+                        {/* Points with hover tooltips */}
+                        {scoreData.scores.map((score, index) => {
+                          const x = index * xStep;
+                          const y = chartHeight - (score / maxScore) * chartHeight;
+                          return (
+                            <g key={index} className="data-point">
+                              <circle
+                                cx={x}
+                                cy={y}
+                                r="4"
+                                fill="#646cff"
+                                stroke="#fff"
+                                strokeWidth="1"
+                              />
+                              {/* Tooltip will be handled with CSS hover */}
+                              <text
+                                x={x}
+                                y={y - 10}
+                                fill="#fff"
+                                fontSize="10"
+                                textAnchor="middle"
+                                className="point-label"
+                              >
+                                {score}%
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                      
+                      {/* X-axis labels */}
+                      <div className="x-axis-labels">
+                        {scoreData.labels.map((label, index) => (
+                          <span 
+                            key={index} 
+                            style={{
+                              left: `${(index / (scoreData.labels.length - 1 || 1)) * 100}%`,
+                              transform: 'translateX(-50%)'
+                            }}
+                          >
+                            {label}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                  ))
-              ) : (
-                <div className="no-completions">
-                  <p>No quiz completions yet</p>
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    <FontAwesomeIcon icon={faInfoCircle} className="info-icon" />
+                    <p>Complete quizzes to see your score history</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Quiz Completion Stats */}
+              <div className="stats-card quiz-completions-card">
+                <h3 className="card-title">Quiz Completions</h3>
+                <div className="completions-grid">
+                  <div className="completion-stat">
+                    <div className="stat-number">{stats.totalCompletions}</div>
+                    <div className="stat-label">Total Completions</div>
+                  </div>
+                  
+                  <div className="completion-stat">
+                    <div className="stat-number">{stats.uniqueDays}</div>
+                    <div className="stat-label">Unique Quiz Days</div>
+                  </div>
+                  
+                  <div className="completion-stat">
+                    <div className="stat-number">{stats.beginner}</div>
+                    <div className="stat-label">Beginner Quizzes</div>
+                  </div>
+                  
+                  <div className="completion-stat">
+                    <div className="stat-number">{stats.intermediate}</div>
+                    <div className="stat-label">Intermediate Quizzes</div>
+                  </div>
+                  
+                  <div className="completion-stat">
+                    <div className="stat-number">{stats.advanced}</div>
+                    <div className="stat-label">Advanced Quizzes</div>
+                  </div>
                 </div>
-              )}
+              </div>
+              
+              {/* Module Progress Card */}
+              <div className="stats-card module-progress-card">
+                <h3 className="card-title">Module Progress</h3>
+                <div className="progress-items">
+                  <div className="progress-item">
+                    <div className="progress-label">
+                      <span className="module-name">Beginner</span>
+                      <span className="module-score">{stats.beginnerHighest}%</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div 
+                        className="progress-fill beginner-fill"
+                        style={{width: `${stats.beginnerHighest}%`}}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="progress-item">
+                    <div className="progress-label">
+                      <span className="module-name">Intermediate</span>
+                      <span className="module-score">{stats.intermediateHighest}%</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div 
+                        className="progress-fill intermediate-fill"
+                        style={{width: `${stats.intermediateHighest}%`}}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="progress-item">
+                    <div className="progress-label">
+                      <span className="module-name">Advanced</span>
+                      <span className="module-score">{stats.advancedHighest}%</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div 
+                        className="progress-fill advanced-fill"
+                        style={{width: `${stats.advancedHighest}%`}}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+        
+        {/* Quizzes Tab */}
+        {activeTab === 'quizzes' && (
+          <div className="statistics-tab-content">
+            <div className="stats-grid quizzes-grid">
+              {/* Beginner Quiz Stats */}
+              <div className="stats-card difficulty-card beginner-card">
+                <div className="difficulty-header">
+                  <div className="difficulty-icon beginner-icon">
+                    <FontAwesomeIcon icon={faListAlt} />
+                  </div>
+                  <h3 className="card-title">Beginner Quizzes</h3>
+                </div>
+                
+                {beginnerStats.attempts > 0 ? (
+                  <div className="difficulty-stats">
+                    <div className="stat-row">
+                      <div className="stat-column">
+                        <div className="stat-item">
+                          <span className="stat-value">{beginnerStats.attempts}</span>
+                          <span className="stat-label">Attempts</span>
+                        </div>
+                        
+                        <div className="stat-item">
+                          <span className="stat-value">{beginnerStats.highestScore}%</span>
+                          <span className="stat-label">Highest Score</span>
+                        </div>
+                      </div>
+                      
+                      <div className="stat-column">
+                        <div className="stat-item">
+                          <span className="stat-value">{beginnerStats.averageScore}%</span>
+                          <span className="stat-label">Average Score</span>
+                        </div>
+                        
+                        <div className="stat-item">
+                          <span className="stat-value">{beginnerStats.passRate}%</span>
+                          <span className="stat-label">Pass Rate</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {beginnerStats.recentScore !== null && (
+                      <div className="recent-score">
+                        <div className="recent-score-label">Most Recent Score:</div>
+                        <div className="recent-score-value">
+                          {beginnerStats.recentScore}%
+                          {beginnerStats.trend === 'up' && <FontAwesomeIcon icon={faArrowUp} className="trend-up" />}
+                          {beginnerStats.trend === 'down' && <FontAwesomeIcon icon={faArrowDown} className="trend-down" />}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    <p>No beginner quizzes completed yet</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Intermediate Quiz Stats */}
+              <div className="stats-card difficulty-card intermediate-card">
+                <div className="difficulty-header">
+                  <div className="difficulty-icon intermediate-icon">
+                    <FontAwesomeIcon icon={faListAlt} />
+                  </div>
+                  <h3 className="card-title">Intermediate Quizzes</h3>
+                </div>
+                
+                {intermediateStats.attempts > 0 ? (
+                  <div className="difficulty-stats">
+                    <div className="stat-row">
+                      <div className="stat-column">
+                        <div className="stat-item">
+                          <span className="stat-value">{intermediateStats.attempts}</span>
+                          <span className="stat-label">Attempts</span>
+                        </div>
+                        
+                        <div className="stat-item">
+                          <span className="stat-value">{intermediateStats.highestScore}%</span>
+                          <span className="stat-label">Highest Score</span>
+                        </div>
+                      </div>
+                      
+                      <div className="stat-column">
+                        <div className="stat-item">
+                          <span className="stat-value">{intermediateStats.averageScore}%</span>
+                          <span className="stat-label">Average Score</span>
+                        </div>
+                        
+                        <div className="stat-item">
+                          <span className="stat-value">{intermediateStats.passRate}%</span>
+                          <span className="stat-label">Pass Rate</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {intermediateStats.recentScore !== null && (
+                      <div className="recent-score">
+                        <div className="recent-score-label">Most Recent Score:</div>
+                        <div className="recent-score-value">
+                          {intermediateStats.recentScore}%
+                          {intermediateStats.trend === 'up' && <FontAwesomeIcon icon={faArrowUp} className="trend-up" />}
+                          {intermediateStats.trend === 'down' && <FontAwesomeIcon icon={faArrowDown} className="trend-down" />}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    <p>No intermediate quizzes completed yet</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Advanced Quiz Stats */}
+              <div className="stats-card difficulty-card advanced-card">
+                <div className="difficulty-header">
+                  <div className="difficulty-icon advanced-icon">
+                    <FontAwesomeIcon icon={faListAlt} />
+                  </div>
+                  <h3 className="card-title">Advanced Quizzes</h3>
+                </div>
+                
+                {advancedStats.attempts > 0 ? (
+                  <div className="difficulty-stats">
+                    <div className="stat-row">
+                      <div className="stat-column">
+                        <div className="stat-item">
+                          <span className="stat-value">{advancedStats.attempts}</span>
+                          <span className="stat-label">Attempts</span>
+                        </div>
+                        
+                        <div className="stat-item">
+                          <span className="stat-value">{advancedStats.highestScore}%</span>
+                          <span className="stat-label">Highest Score</span>
+                        </div>
+                      </div>
+                      
+                      <div className="stat-column">
+                        <div className="stat-item">
+                          <span className="stat-value">{advancedStats.averageScore}%</span>
+                          <span className="stat-label">Average Score</span>
+                        </div>
+                        
+                        <div className="stat-item">
+                          <span className="stat-value">{advancedStats.passRate}%</span>
+                          <span className="stat-label">Pass Rate</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {advancedStats.recentScore !== null && (
+                      <div className="recent-score">
+                        <div className="recent-score-label">Most Recent Score:</div>
+                        <div className="recent-score-value">
+                          {advancedStats.recentScore}%
+                          {advancedStats.trend === 'up' && <FontAwesomeIcon icon={faArrowUp} className="trend-up" />}
+                          {advancedStats.trend === 'down' && <FontAwesomeIcon icon={faArrowDown} className="trend-down" />}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="no-data-message">
+                    <p>No advanced quizzes completed yet</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Recent Quizzes */}
+              <div className="stats-card recent-quizzes-card">
+                <h3 className="card-title">Recent Quiz Activity</h3>
+                
+                <div className="recent-quizzes-list">
+                  {stats.recentQuizzes.length > 0 ? (
+                    stats.recentQuizzes.map((quiz, index) => (
+                      <div key={index} className="recent-quiz-item">
+                        <div className="quiz-date-time">
+                          <FontAwesomeIcon icon={faCalendarAlt} className="date-icon" />
+                          <span>{formatTimeAgo(quiz.completion_date || quiz.date)}</span>
+                        </div>
+                        
+                        <div className="quiz-details">
+                          <div className="quiz-type">
+                            <span className={`difficulty-badge ${getDifficultyClass(quiz.quiz_id)}`}>
+                              {getDifficultyName(quiz.quiz_id)}
+                            </span>
+                          </div>
+                          
+                          <div className="quiz-score">
+                            <span className={`score ${quiz.score >= 70 ? 'passing' : 'failing'}`}>
+                              {quiz.score}%
+                              {quiz.score >= 70 ? (
+                                <FontAwesomeIcon icon={faCheckCircle} className="pass-icon" />
+                              ) : (
+                                <FontAwesomeIcon icon={faTimesCircle} className="fail-icon" />
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-quiz-data">
+                      <p>No quiz activity yet</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Streaks Tab */}
+        {activeTab === 'streaks' && (
+          <div className="statistics-tab-content">
+            <div className="stats-grid streaks-grid">
+              {/* Current Streaks Card */}
+              <div className="stats-card current-streaks-card">
+                <h3 className="card-title">Current Streaks</h3>
+                
+                <div className="streaks-container">
+                  <div className="streak-item">
+                    <div className="streak-icon-container login-streak-icon">
+                      <FontAwesomeIcon icon={faCalendarCheck} className="streak-icon" />
+                    </div>
+                    <div className="streak-content">
+                      <div className="streak-value">{userData?.login_streak || 0}</div>
+                      <div className="streak-label">
+                        Day Login Streak
+                        <div className="streak-subtitle">Consecutive days logged in</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="streak-item">
+                    <div className="streak-icon-container quiz-streak-icon">
+                      <FontAwesomeIcon icon={faQuestionCircle} className="streak-icon" />
+                    </div>
+                    <div className="streak-content">
+                      <div className="streak-value">{userData?.quiz_streak || 0}</div>
+                      <div className="streak-label">
+                        Day Quiz Streak
+                        <div className="streak-subtitle">Consecutive days with quizzes</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Record Streaks Card */}
+              <div className="stats-card record-streaks-card">
+                <h3 className="card-title">Record Streaks</h3>
+                
+                <div className="streaks-container">
+                  <div className="streak-item">
+                    <div className="streak-icon-container login-record-icon">
+                      <FontAwesomeIcon icon={faTrophy} className="streak-icon" />
+                    </div>
+                    <div className="streak-content">
+                      <div className="streak-value">{userData?.longest_login_streak || 0}</div>
+                      <div className="streak-label">
+                        Longest Login Streak
+                        <div className="streak-subtitle">Best consecutive login days</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="streak-item">
+                    <div className="streak-icon-container quiz-record-icon">
+                      <FontAwesomeIcon icon={faTrophy} className="streak-icon" />
+                    </div>
+                    <div className="streak-content">
+                      <div className="streak-value">{userData?.longest_quiz_streak || 0}</div>
+                      <div className="streak-label">
+                        Longest Quiz Streak
+                        <div className="streak-subtitle">Best consecutive quiz days</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Streak Information Card */}
+              <div className="stats-card streak-info-card">
+                <h3 className="card-title">
+                  <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: '8px' }} />
+                  About Streaks
+                </h3>
+                
+                <div className="streak-info-content">
+                  <p>
+                    <strong>Login Streak:</strong> This counter increases each day you log in to the application.
+                    It resets to zero if you don't log in for 24 hours.
+                  </p>
+                  
+                  <p>
+                    <strong>Quiz Streak:</strong> This counter increases each day you complete at least one quiz.
+                    It resets to zero if you don't complete a quiz for 24 hours.
+                  </p>
+                  
+                  <div className="streak-benefits">
+                    <h4>Benefits of Maintaining Streaks:</h4>
+                    <ul>
+                      <li>Unlock special achievements</li>
+                      <li>Track your consistency</li>
+                      <li>Build security awareness habits</li>
+                      <li>Compete on the leaderboard</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
+      
       <style jsx>{`
-        .dashboard-container {
+        /* Main container */
+        .statistics-container {
           max-width: 1200px;
           width: 100%;
           margin: 0 auto;
           padding: 2rem;
         }
-
-        .dashboard-header {
-          margin-bottom: 2rem;
-        }
-
-        .dashboard-header h2 {
-          color: #ffffff;
-          font-size: 1.5rem;
+        
+        .statistics-header {
+          margin-bottom: 1.5rem;
         }
         
-        .statistics-grid {
+        .statistics-header h2 {
+          color: #ffffff;
+          font-size: 1.8rem;
+          margin-bottom: 0.5rem;
+        }
+        
+        .statistics-subtitle {
+          color: #ffffff;
+          font-size: 1rem;
+          font-weight: 300;
+        }
+        
+        /* Tabs styling */
+        .statistics-tabs {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+          border-bottom: 1px solid #333;
+          padding-bottom: 0.5rem;
+        }
+        
+        .tab-btn {
+          background: none;
+          border: none;
+          color: #ffffff;
+          padding: 0.75rem 1.25rem;
+          border-radius: 6px 6px 0 0;
+          cursor: pointer;
+          font-size: 1rem;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .tab-btn:hover {
+          color: #ffffff;
+          background-color: rgba(60, 60, 80, 0.6);
+        }
+        
+        .tab-btn.active {
+          color: #ffffff;
+          background-color: rgba(60, 60, 80, 0.8);
+          border-bottom: 3px solid #646cff;
+        }
+        
+        .tab-icon {
+          font-size: 1rem;
+        }
+        
+        /* Stats grid layout */
+        .stats-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          grid-template-rows: auto;
           gap: 1.5rem;
         }
         
-        .statistics-card {
-          background-color: #1a1a1a;
-          border-radius: 14px;
-          padding: 1.5rem;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        .overview-grid {
+          grid-template-columns: repeat(2, 1fr);
+          grid-template-areas:
+            "scores history"
+            "completions modules";
         }
         
-        .statistics-card h3 {
+        .quizzes-grid {
+          grid-template-columns: repeat(2, 1fr);
+          grid-template-areas:
+            "beginner intermediate"
+            "advanced recent";
+        }
+        
+        .streaks-grid {
+          grid-template-columns: repeat(2, 1fr);
+          grid-template-areas:
+            "current record"
+            "info info";
+        }
+        
+        /* Card styling */
+        .stats-card {
+          background-color: #1a1a1a;
+          border-radius: 12px;
+          padding: 1.5rem;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .card-title {
           color: #ffffff;
-          margin-bottom: 1rem;
+          font-size: 1.2rem;
+          margin-top: 0;
+          margin-bottom: 1.25rem;
+          display: flex;
+          align-items: center;
+        }
+        
+        /* Score Metrics Card */
+        .score-metrics {
+          grid-area: scores;
+        }
+        
+        .metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 1rem;
+        }
+        
+        .metric-item {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          background-color: #242424;
+          padding: 1rem;
+          border-radius: 8px;
+        }
+        
+        .metric-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-size: 1.2rem;
         }
         
-        .score-history-card {
-          grid-column: span 2;
+        .average-icon {
+          background-color: rgba(100, 108, 255, 0.15);
+          color: #646cff;
         }
         
-        .chart-container {
+        .highest-icon {
+          background-color: rgba(46, 204, 113, 0.15);
+          color: #2ecc71;
+        }
+        
+        .lowest-icon {
+          background-color: rgba(231, 76, 60, 0.15);
+          color: #e74c3c;
+        }
+        
+        .pass-icon {
+          background-color: rgba(241, 196, 15, 0.15);
+          color: #f1c40f;
+        }
+        
+        .metric-content {
           display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 140px;
-          padding: 20px 0;
+          flex-direction: column;
         }
         
-        .line-chart {
+        .metric-label {
+          color: #aaaaaa;
+          font-size: 0.9rem;
+        }
+        
+        .metric-value {
+          color: #ffffff;
+          font-size: 1.5rem;
+          font-weight: 600;
+        }
+        
+        /* Score History Chart */
+        .score-history-card {
+          grid-area: history;
+        }
+        
+        .score-chart-container {
+          display: flex;
+          height: 250px;
+        }
+        
+        .y-axis-labels {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding-right: 10px;
+          color: #aaaaaa;
+          font-size: 0.8rem;
+        }
+        
+        .chart-area {
+          flex: 1;
+          position: relative;
+        }
+        
+        .score-chart {
           background-color: #242424;
           border-radius: 8px;
           padding: 10px;
-          width: 100%;
         }
         
-        .module-progress-item {
-          margin-bottom: 1rem;
+        .x-axis-labels {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 8px;
+          color: #aaaaaa;
+          font-size: 0.8rem;
+          position: relative;
+          height: 20px;
         }
         
-        .module-progress-item p {
+        .x-axis-labels span {
+          position: absolute;
+          transform: translateX(-50%);
+        }
+        
+        .data-point:hover .point-label {
+          display: block;
+        }
+        
+        .point-label {
+          display: none;
+        }
+        
+        /* Quiz Completions Card */
+        .quiz-completions-card {
+          grid-area: completions;
+        }
+        
+        .completions-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+          gap: 1rem;
+        }
+        
+        .completion-stat {
+          background-color: #242424;
+          padding: 1rem;
+          border-radius: 8px;
+          text-align: center;
+        }
+        
+        .stat-number {
+          color: #646cff;
+          font-size: 2rem;
+          font-weight: 700;
           margin-bottom: 0.5rem;
-          color: #e0e0e0;
+        }
+        
+        .stat-label {
+          color: #aaaaaa;
+          font-size: 0.9rem;
+        }
+        
+        /* Module Progress Card */
+        .module-progress-card {
+          grid-area: modules;
+        }
+        
+        .progress-items {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+        }
+        
+        .progress-item {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        
+        .progress-label {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .module-name {
+          color: #ffffff;
+          font-weight: 500;
+        }
+        
+        .module-score {
+          color: #aaaaaa;
+          font-size: 0.9rem;
         }
         
         .progress-bar {
-          width: 100%;
           height: 10px;
           background-color: #333;
           border-radius: 5px;
-          margin-top: 0.5rem;
+          overflow: hidden;
         }
-
+        
         .progress-fill {
           height: 100%;
-          background-color: #646cff;
           border-radius: 5px;
           transition: width 0.3s ease;
         }
         
-        .streak-card, .completions-card {
-          grid-column: span 2;
+        .beginner-fill {
+          background-color: #3498db;
         }
         
-        .streaks-container {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 1rem;
+        .intermediate-fill {
+          background-color: #2ecc71;
         }
         
-        .streak-item {
-          background-color: #242424;
-          padding: 1rem;
-          border-radius: 6px;
+        .advanced-fill {
+          background-color: #e74c3c;
+        }
+        
+        /* Difficulty Cards */
+        .difficulty-card {
+          padding: 1.25rem;
+        }
+        
+        .beginner-card {
+          grid-area: beginner;
+        }
+        
+        .intermediate-card {
+          grid-area: intermediate;
+        }
+        
+        .advanced-card {
+          grid-area: advanced;
+        }
+        
+        .difficulty-header {
           display: flex;
           align-items: center;
           gap: 1rem;
+          margin-bottom: 1.25rem;
         }
         
-        .streak-icon-container {
+        .difficulty-icon {
           width: 40px;
           height: 40px;
           border-radius: 50%;
-          background-color: rgba(52, 152, 219, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #3498db;
-        }
-        
-        .streak-info {
-          flex: 1;
-        }
-        
-        .streak-label {
-          margin: 0;
-          color: #95a5a6;
-          font-size: 0.9rem;
-        }
-        
-        .streak-value {
-          margin: 0;
-          color: #ecf0f1;
-          font-weight: bold;
           font-size: 1.2rem;
         }
         
-        .streak-info-box {
-          margin-top: 1rem;
-          padding: 1rem;
-          background-color: rgba(52, 152, 219, 0.1);
-          border-radius: 6px;
-          border-left: 3px solid #3498db;
+        .beginner-icon {
+          background-color: rgba(52, 152, 219, 0.15);
+          color: #3498db;
+        }
+        
+        .intermediate-icon {
+          background-color: rgba(46, 204, 113, 0.15);
+          color: #2ecc71;
+        }
+        
+        .advanced-icon {
+          background-color: rgba(231, 76, 60, 0.15);
+          color: #e74c3c;
+        }
+        
+        .difficulty-stats {
           display: flex;
-          align-items: flex-start;
-          gap: 0.75rem;
+          flex-direction: column;
+          gap: 1rem;
         }
         
-        .streak-info-box .info-icon {
-          color: #3498db;
-          font-size: 1.2rem;
-          margin-top: 2px;
+        .stat-row {
+          display: flex;
+          gap: 1rem;
         }
         
-        .streak-info-box p {
-          margin: 0;
-          color: #e0e0e0;
-          font-size: 0.9rem;
-          line-height: 1.4;
-        }
-        
-        .completion-stats-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        .stat-column {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
           gap: 1rem;
         }
         
         .stat-item {
           background-color: #242424;
           padding: 1rem;
-          border-radius: 6px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
+          border-radius: 8px;
           text-align: center;
         }
         
-        .stat-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 0.5rem;
-          color: white;
-        }
-        
-        .beginner-icon {
-          background-color: rgba(52, 152, 219, 0.2);
-          color: #3498db;
-        }
-        
-        .intermediate-icon {
-          background-color: rgba(46, 204, 113, 0.2);
-          color: #2ecc71;
-        }
-        
-        .advanced-icon {
-          background-color: rgba(231, 76, 60, 0.2);
-          color: #e74c3c;
-        }
-        
-        .stat-label {
-          color: #95a5a6;
-          font-size: 0.9rem;
-          margin-bottom: 0.5rem;
-        }
-        
         .stat-value {
-          color: #ecf0f1;
-          font-weight: bold;
+          color: #ffffff;
           font-size: 1.5rem;
-        }
-        
-        .completions-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-        
-        .completion-item {
-          background-color: #242424;
-          padding: 0.75rem;
-          border-radius: 6px;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .completion-date {
-          font-size: 0.8rem;
-          color: #999;
+          font-weight: 600;
           margin-bottom: 0.25rem;
         }
         
-        .completion-info {
+        .stat-label {
+          color: #aaaaaa;
+          font-size: 0.85rem;
+        }
+        
+        .recent-score {
+          background-color: #242424;
+          padding: 1rem;
+          border-radius: 8px;
+          margin-top: 0.5rem;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
         
-        .difficulty {
-          font-weight: bold;
-          color: #e0e0e0;
+        .recent-score-label {
+          color: #aaaaaa;
+          font-size: 0.9rem;
+        }
+        
+        .recent-score-value {
+          color: #ffffff;
+          font-size: 1.2rem;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .trend-up {
+          color: #2ecc71;
+        }
+        
+        .trend-down {
+          color: #e74c3c;
+        }
+        
+        /* Recent Quizzes Card */
+        .recent-quizzes-card {
+          grid-area: recent;
+        }
+        
+        .recent-quizzes-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          max-height: 350px;
+          overflow-y: auto;
+        }
+        
+        .recent-quiz-item {
+          background-color: #242424;
+          padding: 1rem;
+          border-radius: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        
+        .quiz-date-time {
+          color: #aaaaaa;
+          font-size: 0.85rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        
+        .date-icon {
+          font-size: 0.8rem;
+        }
+        
+        .quiz-details {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .difficulty-badge {
+          font-size: 0.85rem;
+          font-weight: 500;
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+        }
+        
+        .beginner-badge {
+          background-color: rgba(52, 152, 219, 0.15);
+          color: #3498db;
+        }
+        
+        .intermediate-badge {
+          background-color: rgba(46, 204, 113, 0.15);
+          color: #2ecc71;
+        }
+        
+        .advanced-badge {
+          background-color: rgba(231, 76, 60, 0.15);
+          color: #e74c3c;
+        }
+        
+        .quiz-score {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
         }
         
         .score {
-          color: #3498db;
+          font-weight: 600;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 0.5rem;
+        }
+        
+        .passing {
+          color: #2ecc71;
+        }
+        
+        .failing {
+          color: #e74c3c;
         }
         
         .pass-icon {
+          font-size: 0.9rem;
           color: #2ecc71;
         }
         
         .fail-icon {
+          font-size: 0.9rem;
           color: #e74c3c;
         }
         
-        .no-completions {
-          color: #666;
+        /* Streak Cards */
+        .current-streaks-card {
+          grid-area: current;
+        }
+        
+        .record-streaks-card {
+          grid-area: record;
+        }
+        
+        .streak-info-card {
+          grid-area: info;
+        }
+        
+        .streaks-container {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        
+        .streak-item {
+          background-color: #242424;
+          padding: 1rem;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+        
+        .streak-icon-container {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.4rem;
+          flex-shrink: 0;
+        }
+        
+        .login-streak-icon {
+          background-color: rgba(52, 152, 219, 0.15);
+          color: #3498db;
+        }
+        
+        .quiz-streak-icon {
+          background-color: rgba(46, 204, 113, 0.15);
+          color: #2ecc71;
+        }
+        
+        .login-record-icon,
+        .quiz-record-icon {
+          background-color: rgba(241, 196, 15, 0.15);
+          color: #f1c40f;
+        }
+        
+        .streak-content {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+        
+        .streak-value {
+          font-size: 2.5rem;
+          font-weight: 700;
+          color: #ffffff;
+          min-width: 50px;
+          text-align: center;
+        }
+        
+        .streak-label {
+          display: flex;
+          flex-direction: column;
+          color: #ffffff;
+          font-weight: 500;
+        }
+        
+        .streak-subtitle {
+          color: #aaaaaa;
+          font-size: 0.85rem;
+          font-weight: 400;
+          margin-top: 0.25rem;
+        }
+        
+        .streak-info-content {
+          color: #e0e0e0;
+          font-size: 0.95rem;
+          line-height: 1.5;
+        }
+        
+        .streak-info-content p {
+          margin-bottom: 1rem;
+        }
+        
+        .streak-benefits {
+          background-color: #242424;
+          padding: 1rem;
+          border-radius: 8px;
+          margin-top: 1rem;
+        }
+        
+        .streak-benefits h4 {
+          color: #ffffff;
+          margin-top: 0;
+          margin-bottom: 0.75rem;
+          font-size: 1rem;
+        }
+        
+        .streak-benefits ul {
+          margin: 0;
+          padding-left: 1.5rem;
+          color: #e0e0e0;
+        }
+        
+        .streak-benefits li {
+          margin-bottom: 0.5rem;
+        }
+        
+        /* No data message */
+        .no-data-message {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+          color: #aaaaaa;
           font-style: italic;
           text-align: center;
-          padding: 1rem 0;
+          gap: 1rem;
         }
         
-        .accuracy-circle {
-          display: flex;
-          justify-content: center;
+        .info-icon {
+          font-size: 2rem;
+          color: #3498db;
         }
         
-        .progress-circle {
-          width: 150px;
-          height: 150px;
-          position: relative;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .progress-circle-inner {
-          width: 120px;
-          height: 120px;
-          background: #1a1a1a;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .progress-percentage {
-          color: #ffffff;
-          font-size: 1.5rem;
-          font-weight: bold;
+        .no-quiz-data {
+          padding: 2rem;
+          text-align: center;
+          color: #aaaaaa;
+          font-style: italic;
         }
         
+        /* Loading/Error states */
         .loading-container {
           display: flex;
           flex-direction: column;
@@ -811,118 +1573,87 @@ const Statistics = () => {
           background-color: #2980b9;
         }
         
-        /* Difficulty stats styling */
-        .difficulty-card {
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .difficulty-stats {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-          flex: 1;
-        }
-        
-        .stat-row {
-          display: flex;
-          gap: 1rem;
-        }
-        
-        .stat-box {
-          background-color: #242424;
-          border-radius: 6px;
-          padding: 0.75rem;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          flex: 1;
-        }
-        
-        .stat-title {
-          font-size: 0.8rem;
-          color: #95a5a6;
-          margin-bottom: 0.25rem;
-        }
-        
-        .no-attempts, .no-data-message {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5rem;
-          color: #95a5a6;
-          font-style: italic;
-          flex: 1;
-          text-align: center;
-          gap: 0.5rem;
-        }
-        
-        .info-icon {
-          font-size: 1.5rem;
-          color: #3498db;
+        /* Responsive styles */
+        @media (max-width: 992px) {
+          .statistics-container {
+            padding: 1.5rem;
+          }
+          
+          .metrics-grid {
+            grid-template-columns: 1fr;
+          }
         }
         
         @media (max-width: 768px) {
-          .statistics-grid {
+          .overview-grid,
+          .quizzes-grid,
+          .streaks-grid {
             grid-template-columns: 1fr;
-            gap: 1rem;
+            grid-template-areas: none;
           }
           
-          .score-history-card, 
-          .streak-card,
-          .completions-card {
-            grid-column: span 1;
+          .stats-card {
+            grid-area: auto !important;
           }
           
-          .dashboard-container {
-            padding: 1rem;
-          }
-          
-          .streaks-container {
-            grid-template-columns: 1fr;
-          }
-          
-          .completion-stats-grid {
-            grid-template-columns: repeat(2, 1fr);
+          .tab-btn {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
           }
         }
         
         @media (max-width: 480px) {
-          .progress-circle {
-            width: 100px;
-            height: 100px;
+          .statistics-container {
+            padding: 1rem;
           }
           
-          .progress-circle-inner {
-            width: 75px;
-            height: 75px;
+          .statistics-tabs {
+            flex-wrap: wrap;
           }
           
-          .progress-percentage {
-            font-size: 1.2rem;
+          .tab-btn {
+            flex: 1;
+            justify-content: center;
           }
           
-          .completion-stats-grid {
-            grid-template-columns: 1fr;
+          .tab-icon {
+            display: none;
           }
           
           .stat-row {
             flex-direction: column;
+          }
+          
+          .streak-content {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          
+          .streak-value {
+            min-width: auto;
+            text-align: left;
           }
         }
       `}</style>
     </div>
   );
   
-  // Helper function
+  // Helper functions
   function getDifficultyName(quizId) {
     switch (quizId) {
       case 1: return 'Beginner';
       case 2: return 'Intermediate';
       case 3: return 'Advanced';
       default: return 'Unknown';
+    }
+  }
+  
+  function getDifficultyClass(quizId) {
+    switch (quizId) {
+      case 1: return 'beginner-badge';
+      case 2: return 'intermediate-badge';
+      case 3: return 'advanced-badge';
+      default: return '';
     }
   }
 };
