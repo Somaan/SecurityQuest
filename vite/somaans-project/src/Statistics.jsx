@@ -279,7 +279,7 @@ const Statistics = () => {
     <div className="content-wrapper">
       <div className="statistics-container">
         <div className="statistics-header">
-          <h2>Statistics Dashboard</h2>
+          <h2>Statistics</h2>
           <p className="statistics-subtitle">Track your progress and improvement over time</p>
         </div>
         
