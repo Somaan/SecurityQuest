@@ -3,7 +3,7 @@
  */
 
 // API endpoints - changed to use a variable for API base URL
-const API_BASE_URL = 'https://social-engineering-platform-540f710f610b.herokuapp.com';
+const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export const API_ENDPOINTS = {
   LOGIN: `${API_BASE_URL}/login`,

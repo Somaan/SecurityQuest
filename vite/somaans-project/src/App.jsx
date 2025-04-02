@@ -19,7 +19,7 @@ import Quiz from './Quiz';
 /** 
 - Main application component
   - Handles routing logic and authentication state management
-  - Controls access to protected and public routes
+  - Controls Access to protected and public routes
   - Checks for remembered user on initial load
 */
 

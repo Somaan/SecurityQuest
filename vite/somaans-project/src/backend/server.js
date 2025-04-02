@@ -1,11 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const pool = require('./db');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const app = express();
 
+<<<<<<< HEAD
 // This comment is nothing, leave it simply something to push to Heroku
 //another thing 
 //testing to see if backend works in heroku api call
@@ -13,8 +14,9 @@ app.get('/', (req, res) => {
     res.send('Backend is working!');
 });
 
+=======
+>>>>>>> parent of 8b3d44c (Adding dependnancies for Heroku)
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
-
 
 // Set SendGrid API Key
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -26,7 +28,7 @@ console.log('API Key length:', process.env.SENDGRID_API_KEY ? process.env.SENDGR
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: 'http://localhost:5173',
     credentials: true
 }));
 app.use(express.json());
