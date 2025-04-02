@@ -122,7 +122,7 @@ const LoginForm = () => {
         localStorage.removeItem('rememberedUser');
       }
 
-      // Simulate API call delay
+      // Simulate delay
       setTimeout(() => {
         setIsLoading(false);
         setShowCaptcha(true);

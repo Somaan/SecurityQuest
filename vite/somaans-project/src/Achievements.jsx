@@ -27,7 +27,7 @@ const Achievements = () => {
     const fetchAchievements = async () => {
       setLoading(true);
       try {
-        // Call the real API endpoint
+        // Calling API endpoint
         console.log('Fetching achievements for user:', userId);
         const response = await fetch(API_ENDPOINTS.GET_USER_ACHIEVEMENTS.replace(':userId', userId));
         
@@ -57,7 +57,6 @@ const Achievements = () => {
 
   // Helper function to get icon based on achievement title or icon property
   const getIconForAchievement = (achievement) => {
-    // If the achievement has an icon property, use it
     if (achievement.icon) {
       switch (achievement.icon.toLowerCase()) {
         case 'star': return faStar;

@@ -1,12 +1,16 @@
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const app = express();
 
+// This comment is nothing, leave it simply something to push to Heroku
+//another thing 
+
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+
 
 // Set SendGrid API Key
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -18,7 +22,7 @@ console.log('API Key length:', process.env.SENDGRID_API_KEY ? process.env.SENDGR
 
 // Middleware
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || '*',
     credentials: true
 }));
 app.use(express.json());
