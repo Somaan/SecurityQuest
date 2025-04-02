@@ -8,6 +8,10 @@ const app = express();
 
 // This comment is nothing, leave it simply something to push to Heroku
 //another thing 
+//testing to see if backend works in heroku api call
+app.get('/', (req, res) => {
+    res.send('Backend is working!');
+});
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
