@@ -1,21 +1,18 @@
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const pool = require('./db');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const app = express();
 
-<<<<<<< HEAD
 // This comment is nothing, leave it simply something to push to Heroku
 //another thing 
 //testing to see if backend works in heroku api call
-app.get('/', (req, res) => {
-    res.send('Backend is working!');
-});
+//app.get('/api/status', (req, res) => {
+///    res.send('Backend is working!');
+//});
 
-=======
->>>>>>> parent of 8b3d44c (Adding dependnancies for Heroku)
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
 // Set SendGrid API Key
@@ -28,9 +25,9 @@ console.log('API Key length:', process.env.SENDGRID_API_KEY ? process.env.SENDGR
 
 // Middleware
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: ['http://localhost:5173', 'https://social-engineering-platform-540f710f610b.herokuapp.com'],
     credentials: true
-}));
+  }));
 app.use(express.json());
 
 // Login endpoint with Remember Me support
@@ -990,6 +987,13 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
       console.error(`Error fetching achievements for user ${userId}:`, error);
       res.status(500).json({ error: 'Server error' });
     }
+});
+
+const path = require('path')
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 5000;

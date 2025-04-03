@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from "react-toastify";
 import CAPTCHA from './CAPTCHA';
 import { ROUTES } from './Routes';
+import { API_ENDPOINTS } from './constants'; 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRightToBracket, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 
@@ -86,9 +87,9 @@ const LoginForm = () => {
     setIsLoading(true);
 
     try {
-      // API call
+      // Use API_ENDPOINTS.LOGIN instead of hardcoded URL
       console.log('Attempting login with:', {username: formData.username, remember_me: rememberMe });
-      const response = await fetch('http://localhost:5000/api/login', {
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

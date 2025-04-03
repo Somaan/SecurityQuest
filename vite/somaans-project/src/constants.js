@@ -3,21 +3,35 @@
  */
 
 // API endpoints - changed to use a variable for API base URL
-const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || '/api';
+
+// Helper function to determine API URL based on environment
+function getApiBaseUrl() {
+  // Check if running in production (e.g., Heroku)
+  if (window.location.hostname.includes('herokuapp.com')) {
+    // Return empty string to use relative URLs that work with both HTTP and HTTPS
+    return '';
+  }
+  
+  // In development, use the local server
+  return import.meta.env?.VITE_API_BASE_URL || 'http://localhost:5000/api';
+}
+
+const BASE_URL = getApiBaseUrl();
 
 export const API_ENDPOINTS = {
-  LOGIN: `${API_BASE_URL}/login`,
-  REGISTER: `${API_BASE_URL}/register`,
-  FORGOT_PASSWORD: `${API_BASE_URL}/forgot-password`,
-  RESET_PASSWORD: `${API_BASE_URL}/reset-password`,
-  INVALIDATE_REMEMBER_TOKEN: `${API_BASE_URL}/invalidate-remember-token`,
-  GET_USERS: `${API_BASE_URL}/users`,
-  GET_USER_LOGIN_HISTORY: `${API_BASE_URL}/users/login-history`,
-  GET_USER_QUIZ_HISTORY: `${API_BASE_URL}/users/quiz-history`,
-  GET_USER_STREAKS: `${API_BASE_URL}/users/:userId/streaks`,
-  COMPLETE_QUIZ: `${API_BASE_URL}/quiz/complete`,
-  GET_USER_ACHIEVEMENTS: `${API_BASE_URL}/users/:userId/achievements`,
-  GET_QUIZ_QUESTIONS: `${API_BASE_URL}/quiz/questions`, // Future endpoint for quiz questions
+  LOGIN: `${BASE_URL}/api/login`,
+  REGISTER: `${BASE_URL}/api/register`,
+  FORGOT_PASSWORD: `${BASE_URL}/api/forgot-password`,
+  RESET_PASSWORD: `${BASE_URL}/api/reset-password`,
+  INVALIDATE_REMEMBER_TOKEN: `${BASE_URL}/api/invalidate-remember-token`,
+  GET_USERS: `${BASE_URL}/api/users`,
+  GET_USER_LOGIN_HISTORY: `${BASE_URL}/api/users/login-history`,
+  GET_USER_QUIZ_HISTORY: `${BASE_URL}/api/users/quiz-history`,
+  GET_USER_STREAKS: `${BASE_URL}/api/users/:userId/streaks`,
+  COMPLETE_QUIZ: `${BASE_URL}/api/quiz/complete`,
+  GET_USER_ACHIEVEMENTS: `${BASE_URL}/api/users/:userId/achievements`,
+  GET_QUIZ_QUESTIONS: `${BASE_URL}/api/quiz/questions`, 
   
   // Add a mock API for development
   IS_MOCK_API: true,

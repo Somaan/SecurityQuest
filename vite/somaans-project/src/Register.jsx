@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import validator from "validator";
 import { toast } from "react-toastify";
 import CAPTCHA from './CAPTCHA';
-import 'react-toastify/dist/ReactToastify.css';
 import { ROUTES } from './Routes';
+import { API_ENDPOINTS } from './constants'; // Import API_ENDPOINTS
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRightToBracket, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 
@@ -116,8 +116,8 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      //API call
-      const response = await fetch('http://localhost:5000/api/register', {
+      // Use API_ENDPOINTS.REGISTER instead of hardcoded URL
+      const response = await fetch(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
