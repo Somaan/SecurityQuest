@@ -2,19 +2,15 @@
  * Central constants file for the application
  */
 
-// API endpoints - changed to use a variable for API base URL
-const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || '/api';
-
-// Helper function to determine API URL based on environment
 function getApiBaseUrl() {
-  // Check if running in production (e.g., Heroku)
-  if (window.location.hostname.includes('herokuapp.com')) {
-    // Return empty string to use relative URLs that work with both HTTP and HTTPS
-    return '';
+  // Always use relative URLs in production for API endpoints
+  if (window.location.hostname.includes('herokuapp.com') || 
+      process.env.NODE_ENV === 'production') {
+    return '/api'; 
   }
   
   // In development, use the local server
-  return import.meta.env?.VITE_API_BASE_URL || 'http://localhost:5000/api';
+  return 'http://localhost:5000';
 }
 
 const BASE_URL = getApiBaseUrl();
@@ -34,7 +30,7 @@ export const API_ENDPOINTS = {
   GET_QUIZ_QUESTIONS: `${BASE_URL}/api/quiz/questions`, 
   
   // Add a mock API for development
-  IS_MOCK_API: true,
+  IS_MOCK_API: false,
   MOCK_DELAY: 500, // milliseconds delay for mock API responses
 };
 
@@ -42,11 +38,11 @@ export const API_ENDPOINTS = {
 export const CAPTCHA_CONFIG = {
   // Using relative paths for better compatibility
   busImages: [
-      './images/bus1.jpg',
-      './images/bus2.jpg',
-      './images/bus3.jpg',
-      './images/bus4.jpg',
-      './images/bus5.jpg'
+    '/assets/images/bus1.jpg',
+    '/assets/images/bus2.jpg',
+    '/assets/images/bus3.jpg',
+    '/assets/images/bus4.jpg',
+    '/assets/images/bus5.jpg'
   ],
   // Array to define correct cells in CAPTCHA
   correctCellsMap: [

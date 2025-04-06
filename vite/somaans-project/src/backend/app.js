@@ -1,18 +1,23 @@
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs'); 
 const pool = require('./db');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
+const path = require('path');
 const app = express();
+const fs = require('fs');
 
-// This comment is nothing, leave it simply something to push to Heroku
-//another thing 
-//testing to see if backend works in heroku api call
-//app.get('/api/status', (req, res) => {
-///    res.send('Backend is working!');
-//});
+console.log("current directory:", process.cwd());
+console.log("files in current directory:", fs.readdirSync(process.cwd()));
 
+if (fs.existsSync(path.join(process.cwd(), 'dist'))) {
+  console.log("dist directory exists at app root");
+  console.log("Files in dist:", fs.readdirSync(path.join(process.cwd(), 'dist')));
+} else {
+  console.log("dist directory DOES NOT exist at app root");
+}
+// Load environment variables
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
 // Set SendGrid API Key
@@ -22,13 +27,21 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 console.log('Testing environment setup...');
 console.log('SendGrid API Key loaded:', process.env.SENDGRID_API_KEY ? 'Yes' : 'No');
 console.log('API Key length:', process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.length : 0);
+console.log('Environment:', process.env.NODE_ENV || 'production');
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://social-engineering-platform-540f710f610b.herokuapp.com'],
+    origin: process.env.NODE_ENV === 'production' 
+        ? ['https://social-engineering-platform-540f710f610b.herokuapp.com']
+        : ['http://localhost:5173'],
     credentials: true
-  }));
+}));
 app.use(express.json());
+
+// Simple health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', env: process.env.NODE_ENV || 'development' });
+});
 
 // Login endpoint with Remember Me support
 app.post('/api/login', async (req, res) => {
@@ -230,6 +243,11 @@ app.post('/api/forgot-password', async (req, res) => {
         );
         console.log('Token saved successfully');
 
+        // Determine base URL based on environment
+        const baseUrl = process.env.NODE_ENV === 'production' 
+            ? 'https://social-engineering-platform-540f710f610b.herokuapp.com'
+            : 'http://localhost:5173';
+
         // Send reset email using SendGrid API
         console.log('Preparing to send email via SendGrid API...');
         try {
@@ -247,7 +265,7 @@ app.post('/api/forgot-password', async (req, res) => {
                             <p>You have requested to reset your password.</p>
                             <p>Click the button below to reset your password.</p>
                             <div style="text-align: center; margin: 30px 0;">
-                                <a href="http://localhost:5173/reset-password?token=${token}" 
+                                <a href="${baseUrl}/reset-password?token=${token}" 
                                    style="background-color: #007bff; color: white; padding: 12px 24px; 
                                           text-decoration: none; border-radius: 4px; display: inline-block;">
                                     Reset Password
@@ -522,7 +540,7 @@ app.get('/api/users/quiz-history', async (req, res) => {
     }
 });
 
-// Endpoint to reset user streak data - NEW
+// Endpoint to reset user streak data
 app.post('/api/users/:userId/reset-streaks', async (req, res) => {
     const userId = req.params.userId;
     
@@ -546,7 +564,7 @@ app.post('/api/users/:userId/reset-streaks', async (req, res) => {
     }
 });
   
-// Add this endpoint to reset all users' streak data - NEW
+// Add this endpoint to reset all users' streak data
 app.post('/api/admin/reset-all-streaks', async (req, res) => {
     try {
       // Reset streak data for all users
@@ -567,7 +585,7 @@ app.post('/api/admin/reset-all-streaks', async (req, res) => {
     }
 });
 
-// IMPROVED - API endpoint to get detailed streak info for a specific user
+// API endpoint to get detailed streak info for a specific user
 app.get('/api/users/:userId/streaks', async (req, res) => {
     const userId = req.params.userId;
     
@@ -672,7 +690,7 @@ app.get('/api/users/:userId/streaks', async (req, res) => {
     }
 });
 
-// IMPROVED - Endpoint to record a quiz completion 
+// Endpoint to record a quiz completion 
 app.post('/api/quiz/complete', async (req, res) => {
     const { 
         userId,
@@ -977,7 +995,6 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
           progress: Math.min(100, (stats.total_logins / 10) * 100)
         }
       ];
-      
       res.json({
         success: true,
         achievements: achievements
@@ -989,14 +1006,63 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
     }
 });
 
-const path = require('path')
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// API route for quiz questions - use the constants.js data via frontend
+app.get('/api/quiz/questions', (req, res) => {
+    // This is a simple passthrough since you quiz data in constants.js
+    res.json({
+        success: true,
+        message: 'Quiz questions should be retrieved from frontend constants.js'
+    });
 });
 
+// Serve static files - this is crucial for the CAPTCHA images
+app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
+
+if (process.env.NODE_ENV === 'production') {
+  const possibleDistPaths = [
+    path.join(process.cwd(), 'dist'),
+    path.join(process.cwd(), '../dist'),
+    path.join(__dirname, '../dist')
+  ];
+
+  app.use((req, res, next) => {
+    if(req.method === 'GET' && req.path.endsWith('.git')){
+      return res.status(200).end();
+    }
+    next()
+  });
+  
+  //finding the first path that exists
+  const distPath = possibleDistPaths.find(path => fs.existsSync(path));
+
+  if (distPath) {
+    console.log("✓ Found frontend build at:", distPath);
+    app.use(express.static(distPath));
+  }
+    
+    app.get('*', (req, res, next) => {
+      // Skip API routes
+      if (req.path.startsWith('/api')) {
+        return next();
+      }
+      
+      const indexPath = path.join(distPath, 'index.html');
+      
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        console.log("✗ index.html NOT found at", indexPath);
+        res.status(404).send("Frontend files not found");
+      }
+    });
+  } else {
+    console.log("✗ Frontend path NOT found:", distPath);
+  }
+
+
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
