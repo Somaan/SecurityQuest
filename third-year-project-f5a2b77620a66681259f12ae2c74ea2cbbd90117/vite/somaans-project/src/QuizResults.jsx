@@ -62,14 +62,23 @@ const QuizResults = () => {
   const submissionAttemptedRef = useRef(false);
 
   // Get the quiz results from location state
-  const { score, totalQuestions, userAnswers, difficulty, quizId } =
-    location.state || {
-      score: 0,
-      totalQuestions: 0,
-      userAnswers: [],
-      difficulty: "Beginner",
-      quizId: 1,
-    };
+  const {
+    score,
+    totalQuestions,
+    userAnswers,
+    difficulty,
+    quizId,
+    duration,
+    consecutiveCorrect,
+  } = location.state || {
+    score: 0,
+    totalQuestions: 0,
+    userAnswers: [],
+    difficulty: "Beginner",
+    quizId: 1,
+    duration: 0,
+    consecutiveCorrect: 0,
+  };
 
   // Get user ID from session storage
   const userId = sessionStorage.getItem("userId") || "1";
@@ -81,7 +90,7 @@ const QuizResults = () => {
   // Determine pass/fail status based on config threshold
   const passed = percentCorrect >= (QUIZ_CONFIG.PASS_THRESHOLD || 70);
 
-  // This is the updated portion of the useEffect in QuizResults.jsx that handles
+  // This is the updated portion of the useEffect that handles
   // submitting quiz results to the backend with proper timing data
 
   useEffect(() => {
@@ -129,6 +138,10 @@ const QuizResults = () => {
         .substring(2, 10)}`;
 
       try {
+        console.log(
+          `Submitting quiz completion with ID: ${submissionId}, duration: ${duration} seconds`
+        );
+
         // Normalize scores in user answers to ensure none exceed 100%
         const normalizedUserAnswers = userAnswers.map((answer) => ({
           ...answer,
@@ -143,7 +156,7 @@ const QuizResults = () => {
           correctAnswers: score,
           earnedPoints: earnedPoints,
           totalPossiblePoints: totalPossiblePoints,
-          duration: location.state.duration || 0, // Include quiz duration in seconds
+          duration: duration || 0, // Include quiz duration in seconds
           completionDetails: userAnswers.map((answer, index) => ({
             questionIndex: index,
             question: answer.question,
@@ -159,10 +172,6 @@ const QuizResults = () => {
           })),
           submissionId: submissionId, // Add unique submission ID
         };
-
-        console.log(
-          `Submitting quiz completion with ID: ${submissionId}, duration: ${location.state.duration} seconds`
-        );
 
         const response = await fetch(API_ENDPOINTS.COMPLETE_QUIZ, {
           method: "POST",
@@ -266,25 +275,57 @@ const QuizResults = () => {
       answer.type &&
       answer.type !== QUIZ_CONFIG.QUESTION_TYPES.MULTIPLE_CHOICE
     ) {
+      // Calculate points and metrics for the question
+      const earnedPoints = answer.details?.earnedPoints || 0;
+      const maxPoints = answer.details?.maxPoints || 10;
+
+      // For identification questions like phishing, vishing, etc.
+      let identificationStats = null;
+
+      if (
+        answer.type === QUIZ_CONFIG.QUESTION_TYPES.EMAIL_PHISHING ||
+        answer.type === QUIZ_CONFIG.QUESTION_TYPES.WEBSITE_PHISHING
+      ) {
+        // For identification questions with threats
+        const totalThreats =
+          (answer.details?.truePositives?.length || 0) +
+          (answer.details?.falseNegatives?.length || 0);
+        const correctlyIdentified = answer.details?.truePositives?.length || 0;
+
+        identificationStats = `${correctlyIdentified} of ${totalThreats} threats identified correctly`;
+      } else if (
+        answer.type === QUIZ_CONFIG.QUESTION_TYPES.VISHING ||
+        answer.type === QUIZ_CONFIG.QUESTION_TYPES.SMISHING
+      ) {
+        // For vishing/smishing with correct/incorrect options
+        const totalCorrectOptions =
+          answer.details?.correctlySelected?.length || 0;
+        const totalOptions = answer.details?.correctOptions?.length || 0;
+
+        if (totalOptions > 0) {
+          identificationStats = `${totalCorrectOptions} of ${totalOptions} elements identified correctly`;
+        }
+      }
+
       return (
         <div className="question-type-label">
           <span className="question-type">
             {getQuestionTypeDisplay(answer.type)}
           </span>
+
+          <div className="points-indicator">
+            <span className="points-text">
+              {earnedPoints}/{maxPoints} points
+            </span>
+            {identificationStats && (
+              <span className="identification-stats">
+                {identificationStats}
+              </span>
+            )}
+          </div>
+
           {answer.details && (
             <div className="details-summary">
-              {answer.details.earnedPoints !== undefined && (
-                <div className="points-summary">
-                  <span className="points-earned">
-                    {answer.details.earnedPoints}
-                  </span>{" "}
-                  /
-                  <span className="points-possible">
-                    {answer.details.maxPoints}
-                  </span>{" "}
-                  points
-                </div>
-              )}
               {answer.details.truePositives && (
                 <div className="identification-summary">
                   {answer.details.truePositives.length} of{" "}
@@ -311,6 +352,11 @@ const QuizResults = () => {
     // Default rendering for multiple choice
     return (
       <div className="answers">
+        <div className="points-indicator">
+          <span className="points-text">
+            {answer.isCorrect ? "10" : "0"}/10 points
+          </span>
+        </div>
         <div className="answer">
           <span className="answer-label">Your answer:</span>
           <span
@@ -472,7 +518,8 @@ const QuizResults = () => {
         </button>
       </div>
 
-      <style jsx>{`
+      <style jsx="true">{`
+        /* Main container */
         .results-container {
           max-width: 800px;
           margin: 2rem auto;
@@ -745,7 +792,33 @@ const QuizResults = () => {
           background-color: #2980b9;
         }
 
-        /* New question type styled content */
+        /* Points indicator for all question types */
+        .points-indicator {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin: 0.5rem 0;
+          flex-wrap: wrap;
+        }
+
+        .points-text {
+          display: inline-block;
+          background-color: rgba(52, 152, 219, 0.2);
+          color: #3498db;
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          font-weight: 600;
+          font-size: 0.9rem;
+        }
+
+        .identification-stats {
+          display: inline-block;
+          color: #bdc3c7;
+          padding: 0.25rem 0.5rem;
+          font-size: 0.85rem;
+        }
+
+        /* Question type styling */
         .question-type-label {
           margin: 0.5rem 0;
           font-size: 0.9rem;
