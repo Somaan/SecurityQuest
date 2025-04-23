@@ -94,53 +94,56 @@ const Statistics = () => {
       return { scores: [], labels: [] };
     }
 
-    // Sort by date
+    // Sort by date ascending (earliest to latest)
     const sortedHistory = [...quizHistory].sort(
       (a, b) =>
         new Date(a.completion_date || a.date) -
         new Date(b.completion_date || b.date)
     );
 
-    // Take most recent entries (max 10)
-    const recentEntries = sortedHistory.slice(-10);
+    // Take all quiz entries (or limit to most recent 10 if there are many)
+    const recentEntries =
+      sortedHistory.length > 10 ? sortedHistory.slice(-10) : sortedHistory;
 
-    // Map to normalized scores and date labels
-    return {
-      scores: recentEntries.map((entry) => {
-        // Calculate normalized score from various data formats
-        if (
-          entry.earnedPoints !== undefined &&
-          entry.totalPoints !== undefined
-        ) {
-          return Math.round((entry.earnedPoints / entry.totalPoints) * 100);
-        } else if (
-          entry.earned_points !== undefined &&
-          entry.total_possible_points !== undefined
-        ) {
-          return Math.round(
-            (entry.earned_points / entry.total_possible_points) * 100
-          );
-        } else if (
-          entry.correct_answers !== undefined &&
-          entry.total_questions !== undefined
-        ) {
-          return Math.round(
-            (entry.correct_answers / entry.total_questions) * 100
-          );
-        } else {
-          // Fallback to score if points data isn't available
-          return Math.min(100, entry.score || 0);
-        }
-      }),
-      labels: recentEntries.map((entry) => {
-        const date = new Date(entry.completion_date || entry.date);
-        return `${date.getDate().toString().padStart(2, "0")}/${(
-          date.getMonth() + 1
-        )
-          .toString()
-          .padStart(2, "0")}`;
-      }),
-    };
+    // Log what we're working with
+    console.log("Processing quiz history entries:", recentEntries.length);
+
+    // Map each quiz to a normalized score
+    const scores = recentEntries.map((quiz) => {
+      // Try different ways to extract the score
+      let score = 0;
+
+      if (quiz.score !== undefined) {
+        score = Math.min(100, Math.round(quiz.score));
+      } else if (
+        quiz.earnedPoints !== undefined &&
+        quiz.totalPoints !== undefined
+      ) {
+        score = Math.round((quiz.earnedPoints / quiz.totalPoints) * 100);
+      } else if (
+        quiz.correct_answers !== undefined &&
+        quiz.total_questions !== undefined
+      ) {
+        score = Math.round((quiz.correct_answers / quiz.total_questions) * 100);
+      }
+
+      return score;
+    });
+
+    // Map to date labels (DD/MM format)
+    const labels = recentEntries.map((quiz) => {
+      const date = new Date(quiz.completion_date || quiz.date);
+      return `${date.getDate().toString().padStart(2, "0")}/${(
+        date.getMonth() + 1
+      )
+        .toString()
+        .padStart(2, "0")}`;
+    });
+
+    console.log("Final scores array:", scores);
+    console.log("Final labels array:", labels);
+
+    return { scores, labels };
   };
 
   // Format date function - using DD/MM format (not US format)
@@ -332,6 +335,174 @@ const Statistics = () => {
     };
   };
 
+  // Render the score chart with fixes for the line graph
+  const renderScoreChart = () => {
+    // Get score data
+    const scoreData = calculateScoreData();
+
+    // If no scores, show placeholder
+    if (scoreData.scores.length === 0) {
+      return (
+        <div className="no-data-message">
+          <FontAwesomeIcon icon={faInfoCircle} className="info-icon" />
+          <p>Complete quizzes to see your score history</p>
+        </div>
+      );
+    }
+
+    // Calculate chart dimensions
+    const chartWidth = getChartWidth();
+    const chartHeight = getChartHeight();
+    const maxScore = 100; // Always use 100 as max for percentage scores
+
+    // Calculate step size for x-axis based on number of points
+    const xStep =
+      scoreData.scores.length > 1
+        ? chartWidth / (scoreData.scores.length - 1)
+        : chartWidth / 2; // Prevent division by zero
+
+    // Generate points for polyline (connects all scores with straight lines)
+    const points = scoreData.scores
+      .map((score, index) => {
+        const x = index * xStep;
+        const y = chartHeight - (score / maxScore) * chartHeight;
+        return `${x},${y}`;
+      })
+      .join(" ");
+
+    return (
+      <div className="score-chart-container">
+        <div className="y-axis-labels">
+          <span>100%</span>
+          <span>75%</span>
+          <span>50%</span>
+          <span>25%</span>
+          <span>0%</span>
+        </div>
+
+        <div className="chart-area">
+          <svg width={chartWidth} height={chartHeight} className="score-chart">
+            {/* Grid lines */}
+            <line
+              x1="0"
+              y1="0"
+              x2={chartWidth}
+              y2="0"
+              stroke="#444"
+              strokeDasharray="2"
+            />
+            <line
+              x1="0"
+              y1={chartHeight / 4}
+              x2={chartWidth}
+              y2={chartHeight / 4}
+              stroke="#444"
+              strokeDasharray="2"
+            />
+            <line
+              x1="0"
+              y1={chartHeight / 2}
+              x2={chartWidth}
+              y2={chartHeight / 2}
+              stroke="#444"
+              strokeDasharray="2"
+            />
+            <line
+              x1="0"
+              y1={(chartHeight * 3) / 4}
+              x2={chartWidth}
+              y2={(chartHeight * 3) / 4}
+              stroke="#444"
+              strokeDasharray="2"
+            />
+            <line
+              x1="0"
+              y1={chartHeight}
+              x2={chartWidth}
+              y2={chartHeight}
+              stroke="#444"
+              strokeDasharray="2"
+            />
+
+            {/* Pass threshold line (70%) */}
+            <line
+              x1="0"
+              y1={chartHeight - (70 / maxScore) * chartHeight}
+              x2={chartWidth}
+              y2={chartHeight - (70 / maxScore) * chartHeight}
+              stroke="#e67e22"
+              strokeWidth="1.5"
+              strokeDasharray="5,3"
+            />
+            <text
+              x="5"
+              y={chartHeight - (70 / maxScore) * chartHeight - 5}
+              fill="#e67e22"
+              fontSize="10"
+            >
+              Pass threshold (70%)
+            </text>
+
+            {/* Draw the line graph with clear points */}
+            <polyline
+              fill="none"
+              stroke="#646cff"
+              strokeWidth="2"
+              points={points}
+            />
+
+            {/* Draw points at each score */}
+            {scoreData.scores.map((score, index) => {
+              const x = index * xStep;
+              const y = chartHeight - (score / maxScore) * chartHeight;
+              return (
+                <g key={index} className="data-point">
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r="4"
+                    fill="#646cff"
+                    stroke="#fff"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={x}
+                    y={y - 10}
+                    fill="#fff"
+                    fontSize="10"
+                    textAnchor="middle"
+                    className="point-label"
+                  >
+                    {score}%
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* X-axis labels */}
+          <div className="x-axis-labels">
+            {scoreData.labels.map((label, index) => (
+              <span
+                key={index}
+                style={{
+                  left: `${
+                    scoreData.scores.length > 1
+                      ? (index / (scoreData.scores.length - 1)) * 100
+                      : 50
+                  }%`,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="content-wrapper">
@@ -366,25 +537,9 @@ const Statistics = () => {
 
   // Calculate all statistics
   const stats = calculateStats();
-  const scoreData = calculateScoreData();
-  const chartWidth = getChartWidth();
-  const chartHeight = getChartHeight();
   const beginnerStats = calculateDifficultyStats("beginner");
   const intermediateStats = calculateDifficultyStats("intermediate");
   const advancedStats = calculateDifficultyStats("advanced");
-
-  // SVG points calculation for the line chart
-  const maxScore = 100;
-  const xStep = chartWidth / Math.max(scoreData.scores.length - 1, 1);
-
-  // Generate points string for SVG polyline
-  const points = scoreData.scores
-    .map((score, index) => {
-      const x = index * xStep;
-      const y = chartHeight - (score / maxScore) * chartHeight;
-      return `${x},${y}`;
-    })
-    .join(" ");
 
   return (
     <div className="content-wrapper">
@@ -475,154 +630,10 @@ const Statistics = () => {
                 </div>
               </div>
 
-              {/* Score History Card - Improved chart with labels */}
+              {/* Score History Card - Fixed implementation */}
               <div className="stats-card score-history-card">
                 <h3 className="card-title">Quiz Score History</h3>
-
-                {scoreData.scores.length > 0 ? (
-                  <div className="score-chart-container">
-                    <div className="y-axis-labels">
-                      <span>100%</span>
-                      <span>75%</span>
-                      <span>50%</span>
-                      <span>25%</span>
-                      <span>0%</span>
-                    </div>
-
-                    <div className="chart-area">
-                      <svg
-                        width={chartWidth}
-                        height={chartHeight}
-                        className="score-chart"
-                      >
-                        {/* Grid lines */}
-                        <line
-                          x1="0"
-                          y1="0"
-                          x2={chartWidth}
-                          y2="0"
-                          stroke="#444"
-                          strokeDasharray="2"
-                        />
-                        <line
-                          x1="0"
-                          y1={chartHeight / 4}
-                          x2={chartWidth}
-                          y2={chartHeight / 4}
-                          stroke="#444"
-                          strokeDasharray="2"
-                        />
-                        <line
-                          x1="0"
-                          y1={chartHeight / 2}
-                          x2={chartWidth}
-                          y2={chartHeight / 2}
-                          stroke="#444"
-                          strokeDasharray="2"
-                        />
-                        <line
-                          x1="0"
-                          y1={(chartHeight * 3) / 4}
-                          x2={chartWidth}
-                          y2={(chartHeight * 3) / 4}
-                          stroke="#444"
-                          strokeDasharray="2"
-                        />
-                        <line
-                          x1="0"
-                          y1={chartHeight}
-                          x2={chartWidth}
-                          y2={chartHeight}
-                          stroke="#444"
-                          strokeDasharray="2"
-                        />
-
-                        {/* Pass threshold line (70%) */}
-                        <line
-                          x1="0"
-                          y1={chartHeight - (70 / maxScore) * chartHeight}
-                          x2={chartWidth}
-                          y2={chartHeight - (70 / maxScore) * chartHeight}
-                          stroke="#e67e22"
-                          strokeWidth="1.5"
-                          strokeDasharray="5,3"
-                        />
-                        <text
-                          x="5"
-                          y={chartHeight - (70 / maxScore) * chartHeight - 5}
-                          fill="#e67e22"
-                          fontSize="10"
-                        >
-                          Pass threshold (70%)
-                        </text>
-
-                        {/* Main score line */}
-                        <polyline
-                          fill="none"
-                          stroke="#646cff"
-                          strokeWidth="3"
-                          points={points}
-                        />
-
-                        {/* Points with hover tooltips */}
-                        {scoreData.scores.map((score, index) => {
-                          const x = index * xStep;
-                          const y =
-                            chartHeight - (score / maxScore) * chartHeight;
-                          return (
-                            <g key={index} className="data-point">
-                              <circle
-                                cx={x}
-                                cy={y}
-                                r="4"
-                                fill="#646cff"
-                                stroke="#fff"
-                                strokeWidth="1"
-                              />
-                              {/* Tooltip will be handled with CSS hover */}
-                              <text
-                                x={x}
-                                y={y - 10}
-                                fill="#fff"
-                                fontSize="10"
-                                textAnchor="middle"
-                                className="point-label"
-                              >
-                                {score}%
-                              </text>
-                            </g>
-                          );
-                        })}
-                      </svg>
-
-                      {/* X-axis labels */}
-                      <div className="x-axis-labels">
-                        {scoreData.labels.map((label, index) => (
-                          <span
-                            key={index}
-                            style={{
-                              left: `${
-                                (index / (scoreData.labels.length - 1 || 1)) *
-                                100
-                              }%`,
-                              transform: "translateX(-50%)",
-                            }}
-                          >
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="no-data-message">
-                    <FontAwesomeIcon
-                      icon={faInfoCircle}
-                      className="info-icon"
-                    />
-                    <p>Complete quizzes to see your score history</p>
-                  </div>
-                )}
+                {renderScoreChart()}
               </div>
 
               {/* Quiz Completion Stats */}
@@ -1358,12 +1369,13 @@ const Statistics = () => {
           transform: translateX(-50%);
         }
 
-        .data-point:hover .point-label {
-          display: block;
+        /* Fix for the data point labels - make them always visible */
+        .point-label {
+          display: block !important; /* Override to ensure visibility */
         }
 
-        .point-label {
-          display: none;
+        .data-point:hover .point-label {
+          display: block;
         }
 
         /* Quiz Completions Card */
