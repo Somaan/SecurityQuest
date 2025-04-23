@@ -8,6 +8,388 @@ const app = express();
 
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
+// API endpoint to get user achievements
+app.get('/api/users/:userId/achievements', async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+      // Check if user exists
+      const userResult = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Get user stats
+      const userStats = await pool.query(`
+        SELECT 
+          u.login_streak,
+          u.longest_login_streak,
+          u.quiz_streak,
+          u.longest_quiz_streak,
+          (SELECT COUNT(*) FROM quiz_completions WHERE user_id = u.id) AS total_quizzes,
+          (SELECT COUNT(*) FROM user_logins WHERE user_id = u.id) AS total_logins
+        FROM users u
+        WHERE u.id = $1
+      `, [userId]);
+      
+      const stats = userStats.rows[0];
+      
+      // First, get all achievements from the database
+      const achievementsResult = await pool.query(`
+        SELECT id, title, description, icon, color, achievement_type
+        FROM achievements
+        ORDER BY id
+      `);
+      
+      // Then get user's current achievement progress
+      const userAchievementsResult = await pool.query(`
+        SELECT 
+          ua.achievement_id, 
+          ua.unlocked,
+          ua.progress,
+          ua.unlock_date
+        FROM user_achievements ua
+        WHERE ua.user_id = $1
+      `, [userId]);
+      
+      // Map user achievements for easier lookup
+      const userAchievementsMap = {};
+      userAchievementsResult.rows.forEach(ua => {
+        userAchievementsMap[ua.achievement_id] = {
+          unlocked: ua.unlocked,
+          progress: ua.progress,
+          unlockDate: ua.unlock_date
+        };
+      });
+      
+      // Process achievements with current status for this user
+      const achievements = achievementsResult.rows.map(achievement => {
+        let unlocked = false;
+        let progress = 0;
+        let unlockDate = null;
+        
+        // If user has this achievement record, use those values
+        if (userAchievementsMap[achievement.id]) {
+          unlocked = userAchievementsMap[achievement.id].unlocked;
+          progress = userAchievementsMap[achievement.id].progress;
+          unlockDate = userAchievementsMap[achievement.id].unlockDate;
+        } else {
+          // Calculate achievement status based on user stats
+          // This handles cases where we haven't yet created entries in user_achievements
+          
+          switch(achievement.achievement_type) {
+            case 'login_streak':
+              if (achievement.title === 'Dedicated User') {
+                unlocked = stats.login_streak >= 3 || stats.longest_login_streak >= 3;
+                progress = Math.min(100, (stats.login_streak / 3) * 100);
+              } else if (achievement.title === 'Weekly Warrior') {
+                unlocked = stats.login_streak >= 7 || stats.longest_login_streak >= 7;
+                progress = Math.min(100, (stats.login_streak / 7) * 100);
+              } else if (achievement.title === 'Monthly Master') {
+                unlocked = stats.login_streak >= 30 || stats.longest_login_streak >= 30;
+                progress = Math.min(100, (stats.login_streak / 30) * 100);
+              }
+              break;
+              
+            case 'quiz_streak':
+              if (achievement.title === 'Quiz Enthusiast') {
+                unlocked = stats.quiz_streak >= 3 || stats.longest_quiz_streak >= 3;
+                progress = Math.min(100, (stats.quiz_streak / 3) * 100);
+              } else if (achievement.title === 'Quiz Champion') {
+                unlocked = stats.quiz_streak >= 7 || stats.longest_quiz_streak >= 7;
+                progress = Math.min(100, (stats.quiz_streak / 7) * 100);
+              } else if (achievement.title === 'Security Expert') {
+                unlocked = stats.quiz_streak >= 14 || stats.longest_quiz_streak >= 14;
+                progress = Math.min(100, (stats.quiz_streak / 14) * 100);
+              }
+              break;
+              
+            case 'quiz_performance':
+              if (achievement.title === 'Quick Learner') {
+                unlocked = stats.total_quizzes >= 3;
+                progress = Math.min(100, (stats.total_quizzes / 3) * 100);
+              } else if (achievement.title === 'Rising Star') {
+                unlocked = stats.total_quizzes >= 5;
+                progress = Math.min(100, (stats.total_quizzes / 5) * 100);
+              } else if (achievement.title === 'Quiz Master') {
+                unlocked = stats.total_quizzes >= 10;
+                progress = Math.min(100, (stats.total_quizzes / 10) * 100);
+              }
+              break;
+              
+            case 'login_count':
+              if (achievement.title === 'Regular User') {
+                unlocked = stats.total_logins >= 10;
+                progress = Math.min(100, (stats.total_logins / 10) * 100);
+              }
+              break;
+              
+            // Handling for Security Champion will need a separate leaderboard check
+          }
+          
+          // If we've just determined that an achievement is unlocked, save it
+          if (unlocked) {
+            try {
+              // Insert into user_achievements with unlocked=true
+              const now = new Date();
+              pool.query(`
+                INSERT INTO user_achievements (
+                  user_id, achievement_id, unlocked, progress, unlock_date
+                ) VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (user_id, achievement_id) 
+                DO UPDATE SET unlocked = $3, progress = $4, unlock_date = $5
+                WHERE NOT user_achievements.unlocked
+              `, [userId, achievement.id, true, 100, now]);
+              
+              unlockDate = now;
+            } catch (error) {
+              console.error('Error updating achievement status:', error);
+            }
+          }
+          // If not unlocked but has progress, save the progress
+          else if (progress > 0) {
+            try {
+              pool.query(`
+                INSERT INTO user_achievements (
+                  user_id, achievement_id, unlocked, progress
+                ) VALUES ($1, $2, $3, $4)
+                ON CONFLICT (user_id, achievement_id) 
+                DO UPDATE SET progress = $4
+                WHERE user_achievements.progress < $4
+              `, [userId, achievement.id, false, progress]);
+            } catch (error) {
+              console.error('Error updating achievement progress:', error);
+            }
+          }
+        }
+        
+        return {
+          id: achievement.id,
+          title: achievement.title,
+          description: achievement.description,
+          icon: achievement.icon,
+          color: achievement.color,
+          unlocked,
+          progress,
+          unlockDate
+        };
+      });
+      
+      // For Security Champion achievement, check leaderboard position
+      try {
+        // Get top user from leaderboard
+        const topUserResult = await pool.query(`
+          SELECT id 
+          FROM users 
+          ORDER BY (COALESCE(login_streak, 0) + COALESCE(quiz_streak, 0)) DESC, 
+                   username ASC
+          LIMIT 1
+        `);
+        
+        if (topUserResult.rows.length > 0 && topUserResult.rows[0].id == userId) {
+          // This user is top of leaderboard, update Security Champion achievement
+          const securityChampion = achievements.find(a => a.title === 'Security Champion');
+          if (securityChampion) {
+            securityChampion.unlocked = true;
+            securityChampion.progress = 100;
+            
+            // Save this achievement
+            if (!userAchievementsMap[securityChampion.id]?.unlocked) {
+              const now = new Date();
+              await pool.query(`
+                INSERT INTO user_achievements (
+                  user_id, achievement_id, unlocked, progress, unlock_date
+                ) VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (user_id, achievement_id) 
+                DO UPDATE SET unlocked = $3, progress = $4, unlock_date = $5
+              `, [userId, securityChampion.id, true, 100, now]);
+              
+              securityChampion.unlockDate = now;
+            }
+          }
+        } else {
+          // If not top of leaderboard, update progress proportionally
+          // For simplicity, we'll just set it to a partial value
+          const securityChampion = achievements.find(a => a.title === 'Security Champion');
+          if (securityChampion && !securityChampion.unlocked) {
+            securityChampion.progress = 25; // Arbitrary partial progress
+          }
+        }
+      } catch (error) {
+        console.error('Error checking leaderboard position:', error);
+      }
+      
+      res.json({
+        success: true,
+        achievements: achievements
+      });
+      
+    } catch (error) {
+      console.error(`Error fetching achievements for user ${userId}:`, error);
+      res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Check for new achievements endpoint
+app.get('/api/users/:userId/check-achievements', async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+        // Get the user's previously unlocked achievements
+        const previousResult = await pool.query(`
+            SELECT achievement_id
+            FROM user_achievements
+            WHERE user_id = $1 AND unlocked = TRUE
+        `, [userId]);
+        
+        const previousUnlocked = new Set(previousResult.rows.map(row => row.achievement_id));
+        
+        // Get current achievements
+        const achievementsResponse = await fetch(`${req.protocol}://${req.get('host')}/api/users/${userId}/achievements`);
+        const achievementsData = await achievementsResponse.json();
+        
+        if (!achievementsData.success || !achievementsData.achievements) {
+            throw new Error('Failed to fetch current achievements');
+        }
+        
+        // Find newly unlocked achievements
+        const newlyUnlocked = achievementsData.achievements.filter(a => 
+            a.unlocked && !previousUnlocked.has(a.id)
+        );
+        
+        res.json({
+            success: true,
+            newAchievements: newlyUnlocked
+        });
+    } catch (error) {
+        console.error('Error checking for new achievements:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get user's threat identification performance stats
+app.get('/api/users/:userId/threat-performance', async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+        // Get overall threat identification performance by question type
+        const performanceResult = await pool.query(`
+            SELECT 
+                qa.question_type,
+                COUNT(*) as total_questions,
+                SUM(qa.earned_points) as total_earned_points,
+                SUM(qa.max_points) as total_max_points,
+                ROUND(AVG(qa.earned_points * 100.0 / NULLIF(qa.max_points, 0)), 1) as average_percent
+            FROM quiz_answers qa
+            JOIN quiz_completions qc ON qa.completion_id = qc.id
+            WHERE qc.user_id = $1 AND qa.question_type != 'multiple_choice'
+            GROUP BY qa.question_type
+            ORDER BY qa.question_type
+        `, [userId]);
+        
+        // Get most common missed threats by question type
+        const missedThreatsResult = await pool.query(`
+            SELECT 
+                qa.question_type,
+                qa.identifications,
+                COUNT(*) as frequency
+            FROM quiz_answers qa
+            JOIN quiz_completions qc ON qa.completion_id = qc.id
+            WHERE 
+                qc.user_id = $1 AND 
+                qa.question_type != 'multiple_choice' AND
+                qa.identifications IS NOT NULL
+            GROUP BY qa.question_type, qa.identifications
+            ORDER BY COUNT(*) DESC
+            LIMIT 10
+        `, [userId]);
+        
+        // Process the missed threats to extract common patterns
+        const missedThreatsAnalysis = {};
+        
+        missedThreatsResult.rows.forEach(row => {
+            if (!missedThreatsAnalysis[row.question_type]) {
+                missedThreatsAnalysis[row.question_type] = [];
+            }
+            
+            try {
+                const identifications = JSON.parse(row.identifications);
+                if (identifications.falseNegatives && identifications.falseNegatives.length > 0) {
+                    // Add missed threats with their frequency
+                    identifications.falseNegatives.forEach(threatId => {
+                        const existingThreat = missedThreatsAnalysis[row.question_type].find(t => t.id === threatId);
+                        if (existingThreat) {
+                            existingThreat.frequency += row.frequency;
+                        } else {
+                            missedThreatsAnalysis[row.question_type].push({
+                                id: threatId,
+                                frequency: row.frequency
+                            });
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Error parsing identifications:', err);
+            }
+        });
+        
+        // Sort by frequency and limit to top 5 per question type
+        Object.keys(missedThreatsAnalysis).forEach(questionType => {
+            missedThreatsAnalysis[questionType].sort((a, b) => b.frequency - a.frequency);
+            missedThreatsAnalysis[questionType] = missedThreatsAnalysis[questionType].slice(0, 5);
+        });
+        
+        res.json({
+            success: true,
+            performance: performanceResult.rows,
+            missedThreats: missedThreatsAnalysis
+        });
+    } catch (error) {
+        console.error('Error fetching threat identification performance:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get user's improvement over time for threat identification
+app.get('/api/users/:userId/threat-progress', async (req, res) => {
+    const userId = req.params.userId;
+    
+    try {
+        // Get weekly progress data for the last 3 months
+        const progressResult = await pool.query(`
+            SELECT 
+                DATE_TRUNC('week', qc.completion_date) AS week,
+                qa.question_type,
+                AVG(qa.earned_points * 100.0 / NULLIF(qa.max_points, 0)) AS average_percent
+            FROM 
+                quiz_answers qa
+                JOIN quiz_completions qc ON qa.completion_id = qc.id
+            WHERE 
+                qc.user_id = $1 AND 
+                qa.question_type != 'multiple_choice' AND
+                qc.completion_date > CURRENT_DATE - INTERVAL '3 months'
+            GROUP BY 
+                DATE_TRUNC('week', qc.completion_date),
+                qa.question_type
+            ORDER BY 
+                week, qa.question_type
+        `, [userId]);
+        
+        res.json({
+            success: true,
+            progress: progressResult.rows
+        });
+    } catch (error) {
+        console.error('Error fetching threat progress data:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+});
+
 // Set SendGrid API Key
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -687,42 +1069,39 @@ app.post('/api/quiz/complete', async (req, res) => {
         userId,
         quizId,
         score,
-        duration: duration || 'Not provided',
+        duration: duration,
         totalQuestions,
         correctAnswers
     });
 
     try {
-        // Store time in quiz_attempts
-        await pool.query (`
+        // Validate that duration is provided since it's a required field
+        if (!duration) {
+            console.error('Missing required field: duration_seconds');
+            return res.status(400).json({ error: 'Missing required field: duration_seconds' });
+        }
+        
+        // Store time in quiz_attempts (mandatory)
+        await pool.query(`
             INSERT INTO quiz_attempts (
             user_id,
             quiz_id,
             score,
             duration_seconds,
+            total_questions,
             correct_answers
         ) VALUES ($1, $2, $3, $4, $5, $6)
         `, [userId, quizId, score, duration, totalQuestions, correctAnswers]);
         
-        console.log("Stored quiz attempt timing data: ${duration} seconds");
-
-        res.json({
-            success: true,
-            message: "Quiz attempt with timing data recorded successfully"
-        });
-    } catch (error) {
-        console.error("Error recording quiz attempt:", error);
-        res.status(500).json({ error: 'Server error', details: error.message});
-    }
-
-    console.log('Received quiz completion data:', {
-        userId, quizId, score,
-        totalQuestions, 
-        completionDetailsLength: completionDetails ? completionDetails.length : 0,
-        submissionId: submissionId || 'Not provided'
-    });
+        console.log(`Stored quiz attempt timing data: ${duration} seconds`);
     
-    try {
+        console.log('Received quiz completion data:', {
+            userId, quizId, score,
+            totalQuestions, 
+            completionDetailsLength: completionDetails ? completionDetails.length : 0,
+            submissionId: submissionId || 'Not provided'
+        });
+        
         // Check for duplicate submission by submissionId
         if (submissionId) {
             try {
@@ -934,15 +1313,6 @@ app.post('/api/quiz/complete', async (req, res) => {
             }
         }
 
-        // Count the number of completed quizzes for this user
-        const quizCountResult = await pool.query(`
-            SELECT COUNT(*) as count
-            FROM quiz_completions
-            WHERE user_id = $1
-        `, [userId]);
-        
-        const totalQuizCount = parseInt(quizCountResult.rows[0].count);
-        
         // Update quiz streak based on date
         const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
         
@@ -999,6 +1369,15 @@ app.post('/api/quiz/complete', async (req, res) => {
             FROM users
             WHERE id = $1
         `, [userId]);
+
+        // Count the number of completed quizzes for this user
+        const quizCountResult = await pool.query(`
+            SELECT COUNT(*) as count
+            FROM quiz_completions
+            WHERE user_id = $1
+        `, [userId]);
+        
+        const totalQuizCount = parseInt(quizCountResult.rows[0].count);
     
         res.json({
             success: true,
@@ -1016,382 +1395,5 @@ app.post('/api/quiz/complete', async (req, res) => {
     } catch (error) {
         console.error('Error recording quiz completion:', error);
         res.status(500).json({ error: 'Server error', details: error.message });
-    }
-});
-
-// API endpoint to get user achievements
-// API endpoint to get user achievements - UPDATED
-// API endpoint to get user achievements - UPDATED
-app.get('/api/users/:userId/achievements', async (req, res) => {
-    const userId = req.params.userId;
-    
-    try {
-      // Check if user exists
-      const userResult = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      // Get user stats
-      const userStats = await pool.query(`
-        SELECT 
-          u.login_streak,
-          u.longest_login_streak,
-          u.quiz_streak,
-          u.longest_quiz_streak,
-          (SELECT COUNT(*) FROM quiz_completions WHERE user_id = u.id) AS total_quizzes,
-          (SELECT COUNT(*) FROM user_logins WHERE user_id = u.id) AS total_logins
-        FROM users u
-        WHERE u.id = $1
-      `, [userId]);
-      
-      const stats = userStats.rows[0];
-      
-      // First, get all achievements from the database
-      const achievementsResult = await pool.query(`
-        SELECT id, title, description, icon, color, achievement_type
-        FROM achievements
-        ORDER BY id
-      `);
-      
-      // Then get user's current achievement progress
-      const userAchievementsResult = await pool.query(`
-        SELECT 
-          ua.achievement_id, 
-          ua.unlocked,
-          ua.progress,
-          ua.unlock_date
-        FROM user_achievements ua
-        WHERE ua.user_id = $1
-      `, [userId]);
-      
-      // Map user achievements for easier lookup
-      const userAchievementsMap = {};
-      userAchievementsResult.rows.forEach(ua => {
-        userAchievementsMap[ua.achievement_id] = {
-          unlocked: ua.unlocked,
-          progress: ua.progress,
-          unlockDate: ua.unlock_date
-        };
-      });
-      
-      // Process achievements with current status for this user
-      const achievements = achievementsResult.rows.map(achievement => {
-        let unlocked = false;
-        let progress = 0;
-        let unlockDate = null;
-        
-        // If user has this achievement record, use those values
-        if (userAchievementsMap[achievement.id]) {
-          unlocked = userAchievementsMap[achievement.id].unlocked;
-          progress = userAchievementsMap[achievement.id].progress;
-          unlockDate = userAchievementsMap[achievement.id].unlockDate;
-        } else {
-          // Calculate achievement status based on user stats
-          // This handles cases where we haven't yet created entries in user_achievements
-          
-          switch(achievement.achievement_type) {
-            case 'login_streak':
-              if (achievement.title === 'Dedicated User') {
-                unlocked = stats.login_streak >= 3 || stats.longest_login_streak >= 3;
-                progress = Math.min(100, (stats.login_streak / 3) * 100);
-              } else if (achievement.title === 'Weekly Warrior') {
-                unlocked = stats.login_streak >= 7 || stats.longest_login_streak >= 7;
-                progress = Math.min(100, (stats.login_streak / 7) * 100);
-              } else if (achievement.title === 'Monthly Master') {
-                unlocked = stats.login_streak >= 30 || stats.longest_login_streak >= 30;
-                progress = Math.min(100, (stats.login_streak / 30) * 100);
-              }
-              break;
-              
-            case 'quiz_streak':
-              if (achievement.title === 'Quiz Enthusiast') {
-                unlocked = stats.quiz_streak >= 3 || stats.longest_quiz_streak >= 3;
-                progress = Math.min(100, (stats.quiz_streak / 3) * 100);
-              } else if (achievement.title === 'Quiz Champion') {
-                unlocked = stats.quiz_streak >= 7 || stats.longest_quiz_streak >= 7;
-                progress = Math.min(100, (stats.quiz_streak / 7) * 100);
-              } else if (achievement.title === 'Security Expert') {
-                unlocked = stats.quiz_streak >= 14 || stats.longest_quiz_streak >= 14;
-                progress = Math.min(100, (stats.quiz_streak / 14) * 100);
-              }
-              break;
-              
-            case 'quiz_performance':
-              if (achievement.title === 'Quick Learner') {
-                unlocked = stats.total_quizzes >= 3;
-                progress = Math.min(100, (stats.total_quizzes / 3) * 100);
-              } else if (achievement.title === 'Rising Star') {
-                unlocked = stats.total_quizzes >= 5;
-                progress = Math.min(100, (stats.total_quizzes / 5) * 100);
-              } else if (achievement.title === 'Quiz Master') {
-                unlocked = stats.total_quizzes >= 10;
-                progress = Math.min(100, (stats.total_quizzes / 10) * 100);
-              }
-              break;
-              
-            case 'login_count':
-              if (achievement.title === 'Regular User') {
-                unlocked = stats.total_logins >= 10;
-                progress = Math.min(100, (stats.total_logins / 10) * 100);
-              }
-              break;
-              
-            // Handling for Security Champion will need a separate leaderboard check
-          }
-          
-          // If we've just determined that an achievement is unlocked, save it
-          if (unlocked) {
-            try {
-              // Insert into user_achievements with unlocked=true
-              const now = new Date();
-              pool.query(`
-                INSERT INTO user_achievements (
-                  user_id, achievement_id, unlocked, progress, unlock_date
-                ) VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (user_id, achievement_id) 
-                DO UPDATE SET unlocked = $3, progress = $4, unlock_date = $5
-                WHERE NOT user_achievements.unlocked
-              `, [userId, achievement.id, true, 100, now]);
-              
-              unlockDate = now;
-            } catch (error) {
-              console.error('Error updating achievement status:', error);
-            }
-          }
-          // If not unlocked but has progress, save the progress
-          else if (progress > 0) {
-            try {
-              pool.query(`
-                INSERT INTO user_achievements (
-                  user_id, achievement_id, unlocked, progress
-                ) VALUES ($1, $2, $3, $4)
-                ON CONFLICT (user_id, achievement_id) 
-                DO UPDATE SET progress = $4
-                WHERE user_achievements.progress < $4
-              `, [userId, achievement.id, false, progress]);
-            } catch (error) {
-              console.error('Error updating achievement progress:', error);
-            }
-          }
-        }
-        
-        return {
-          id: achievement.id,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          color: achievement.color,
-          unlocked,
-          progress,
-          unlockDate
-        };
-      });
-      
-      // For Security Champion achievement, check leaderboard position
-      try {
-        // Get top user from leaderboard
-        const topUserResult = await pool.query(`
-          SELECT id 
-          FROM users 
-          ORDER BY (COALESCE(login_streak, 0) + COALESCE(quiz_streak, 0)) DESC, 
-                   username ASC
-          LIMIT 1
-        `);
-        
-        if (topUserResult.rows.length > 0 && topUserResult.rows[0].id == userId) {
-          // This user is top of leaderboard, update Security Champion achievement
-          const securityChampion = achievements.find(a => a.title === 'Security Champion');
-          if (securityChampion) {
-            securityChampion.unlocked = true;
-            securityChampion.progress = 100;
-            
-            // Save this achievement
-            if (!userAchievementsMap[securityChampion.id]?.unlocked) {
-              const now = new Date();
-              await pool.query(`
-                INSERT INTO user_achievements (
-                  user_id, achievement_id, unlocked, progress, unlock_date
-                ) VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (user_id, achievement_id) 
-                DO UPDATE SET unlocked = $3, progress = $4, unlock_date = $5
-              `, [userId, securityChampion.id, true, 100, now]);
-              
-              securityChampion.unlockDate = now;
-            }
-          }
-        } else {
-          // If not top of leaderboard, update progress proportionally
-          // For simplicity, we'll just set it to a partial value
-          const securityChampion = achievements.find(a => a.title === 'Security Champion');
-          if (securityChampion && !securityChampion.unlocked) {
-            securityChampion.progress = 25; // Arbitrary partial progress
-          }
-        }
-      } catch (error) {
-        console.error('Error checking leaderboard position:', error);
-      }
-      
-      // Add a new endpoint to check for new achievements
-      app.get('/api/users/:userId/check-achievements', async (req, res) => {
-          const userId = req.params.userId;
-          
-          try {
-              // Get the user's previously unlocked achievements
-              const previousResult = await pool.query(`
-                  SELECT achievement_id
-                  FROM user_achievements
-                  WHERE user_id = $1 AND unlocked = TRUE
-              `, [userId]);
-              
-              const previousUnlocked = new Set(previousResult.rows.map(row => row.achievement_id));
-              
-              // Get current achievements (using the same logic from the main endpoint)
-              // [... Achievement calculation logic here - same as above ...]
-              
-              // Find newly unlocked achievements
-              const newlyUnlocked = achievements.filter(a => 
-                  a.unlocked && !previousUnlocked.has(a.id)
-              );
-              
-              res.json({
-                  success: true,
-                  newAchievements: newlyUnlocked
-              });
-          } catch (error) {
-              console.error('Error checking for new achievements:', error);
-              res.status(500).json({ error: 'Server error' });
-          }
-      });
-      
-      res.json({
-        success: true,
-        achievements: achievements
-      });
-      
-    } catch (error) {
-      console.error(`Error fetching achievements for user ${userId}:`, error);
-      res.status(500).json({ error: 'Server error' });
-    }
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
-// Get user's threat identification performance stats
-app.get('/api/users/:userId/threat-performance', async (req, res) => {
-    const userId = req.params.userId;
-    
-    try {
-        // Get overall threat identification performance by question type
-        const performanceResult = await pool.query(`
-            SELECT 
-                qa.question_type,
-                COUNT(*) as total_questions,
-                SUM(qa.earned_points) as total_earned_points,
-                SUM(qa.max_points) as total_max_points,
-                ROUND(AVG(qa.earned_points * 100.0 / NULLIF(qa.max_points, 0)), 1) as average_percent
-            FROM quiz_answers qa
-            JOIN quiz_completions qc ON qa.completion_id = qc.id
-            WHERE qc.user_id = $1 AND qa.question_type != 'multiple_choice'
-            GROUP BY qa.question_type
-            ORDER BY qa.question_type
-        `, [userId]);
-        
-        // Get most common missed threats by question type
-        const missedThreatsResult = await pool.query(`
-            SELECT 
-                qa.question_type,
-                qa.identifications,
-                COUNT(*) as frequency
-            FROM quiz_answers qa
-            JOIN quiz_completions qc ON qa.completion_id = qc.id
-            WHERE 
-                qc.user_id = $1 AND 
-                qa.question_type != 'multiple_choice' AND
-                qa.identifications IS NOT NULL
-            GROUP BY qa.question_type, qa.identifications
-            ORDER BY COUNT(*) DESC
-            LIMIT 10
-        `, [userId]);
-        
-        // Process the missed threats to extract common patterns
-        const missedThreatsAnalysis = {};
-        
-        missedThreatsResult.rows.forEach(row => {
-            if (!missedThreatsAnalysis[row.question_type]) {
-                missedThreatsAnalysis[row.question_type] = [];
-            }
-            
-            try {
-                const identifications = JSON.parse(row.identifications);
-                if (identifications.falseNegatives && identifications.falseNegatives.length > 0) {
-                    // Add missed threats with their frequency
-                    identifications.falseNegatives.forEach(threatId => {
-                        const existingThreat = missedThreatsAnalysis[row.question_type].find(t => t.id === threatId);
-                        if (existingThreat) {
-                            existingThreat.frequency += row.frequency;
-                        } else {
-                            missedThreatsAnalysis[row.question_type].push({
-                                id: threatId,
-                                frequency: row.frequency
-                            });
-                        }
-                    });
-                }
-            } catch (err) {
-                console.error('Error parsing identifications:', err);
-            }
-        });
-        
-        // Sort by frequency and limit to top 5 per question type
-        Object.keys(missedThreatsAnalysis).forEach(questionType => {
-            missedThreatsAnalysis[questionType].sort((a, b) => b.frequency - a.frequency);
-            missedThreatsAnalysis[questionType] = missedThreatsAnalysis[questionType].slice(0, 5);
-        });
-        
-        res.json({
-            success: true,
-            performance: performanceResult.rows,
-            missedThreats: missedThreatsAnalysis
-        });
-    } catch (error) {
-        console.error('Error fetching threat identification performance:', error);
-        res.status(500).json({ error: 'Server error' });
-    }
-});
-// Get user's improvement over time for threat identification
-app.get('/api/users/:userId/threat-progress', async (req, res) => {
-    const userId = req.params.userId;
-    
-    try {
-        // Get weekly progress data for the last 3 months
-        const progressResult = await pool.query(`
-            SELECT 
-                DATE_TRUNC('week', qc.completion_date) AS week,
-                qa.question_type,
-                AVG(qa.earned_points * 100.0 / NULLIF(qa.max_points, 0)) AS average_percent
-            FROM 
-                quiz_answers qa
-                JOIN quiz_completions qc ON qa.completion_id = qc.id
-            WHERE 
-                qc.user_id = $1 AND 
-                qa.question_type != 'multiple_choice' AND
-                qc.completion_date > CURRENT_DATE - INTERVAL '3 months'
-            GROUP BY 
-                DATE_TRUNC('week', qc.completion_date),
-                qa.question_type
-            ORDER BY 
-                week, qa.question_type
-        `, [userId]);
-        
-        res.json({
-            success: true,
-            progress: progressResult.rows
-        });
-    } catch (error) {
-        console.error('Error fetching threat progress data:', error);
-        res.status(500).json({ error: 'Server error' });
     }
 });
