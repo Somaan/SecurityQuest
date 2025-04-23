@@ -84,11 +84,81 @@ const QuizResults = () => {
   const userId = sessionStorage.getItem("userId") || "1";
   const username = sessionStorage.getItem("username") || "User";
 
+  // Calculate the actual correct answers and total points
+  const [earnedPoints, totalPoints, correctAnswers] =
+    calculateScoreDetails(userAnswers);
+
   // Calculate percentages for the statistics (normalized to 0-100%)
-  const percentCorrect = calculatePercentScore(score, totalQuestions);
+  // Use our calculated values rather than the passed score
+  const percentCorrect =
+    totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
   // Determine pass/fail status based on config threshold
   const passed = percentCorrect >= (QUIZ_CONFIG.PASS_THRESHOLD || 70);
+
+  // Function to calculate score details from userAnswers
+  function calculateScoreDetails(answers) {
+    let earned = 0;
+    let total = 0;
+    let correct = 0;
+
+    if (!answers || answers.length === 0) {
+      return [0, 0, 0];
+    }
+
+    answers.forEach((answer) => {
+      // For special question types with explicit point values
+      if (
+        answer.type &&
+        answer.type !== QUIZ_CONFIG.QUESTION_TYPES.MULTIPLE_CHOICE
+      ) {
+        if (answer.details) {
+          // If we have earnedPoints and maxPoints in the details
+          if (
+            answer.details.earnedPoints !== undefined &&
+            answer.details.maxPoints !== undefined
+          ) {
+            earned += answer.details.earnedPoints;
+            total += answer.details.maxPoints;
+            // Count as correct if score is at least 70%
+            if (answer.details.earnedPoints / answer.details.maxPoints >= 0.7) {
+              correct += 1;
+            }
+          }
+          // If we just have score percentage
+          else if (answer.score !== undefined) {
+            const questionPoints = 10; // Default points per question
+            earned += (answer.score / 100) * questionPoints;
+            total += questionPoints;
+            if (answer.score >= 70) {
+              correct += 1;
+            }
+          }
+        }
+        // If we just have score percentage
+        else if (answer.score !== undefined) {
+          const questionPoints = 10; // Default points per question
+          earned += (answer.score / 100) * questionPoints;
+          total += questionPoints;
+          if (answer.score >= 70) {
+            correct += 1;
+          }
+        }
+      }
+      // For multiple choice questions
+      else {
+        if (answer.isCorrect !== undefined) {
+          total += 10;
+          if (answer.isCorrect) {
+            earned += 10;
+            correct += 1;
+          }
+        }
+      }
+    });
+
+    return [earned, total, correct];
+  }
 
   // This is the updated portion of the useEffect that handles
   // submitting quiz results to the backend with proper timing data
@@ -108,38 +178,9 @@ const QuizResults = () => {
       submissionAttemptedRef.current = true;
       setIsSubmittingScore(true);
 
-      let totalPossiblePoints = 0;
-      let earnedPoints = 0;
-
-      // Process each answer to determine points given
-      userAnswers.forEach((answer) => {
-        if (answer.type === QUIZ_CONFIG.QUESTION_TYPES.MULTIPLE_CHOICE) {
-          totalPossiblePoints += 10;
-          earnedPoints += answer.isCorrect ? 10 : 0;
-        } else if (answer.details) {
-          const questionPoints = answer.details.maxPoints || 10;
-          totalPossiblePoints += questionPoints;
-          earnedPoints += answer.details.earnedPoints || 0;
-        } else {
-          totalPossiblePoints += 10;
-          earnedPoints += (answer.score / 100) * 10;
-        }
-      });
-
-      // Calculate normalised percentage based on earned vs possible points
-      const normalisedPercentCorrect =
-        totalPossiblePoints > 0
-          ? Math.round((earnedPoints / totalPossiblePoints) * 100)
-          : 0;
-
-      // Generate unique tracking id for specific quiz submission
-      const submissionId = `${userId}-${quizId}-${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2, 10)}`;
-
       try {
         console.log(
-          `Submitting quiz completion with ID: ${submissionId}, duration: ${duration} seconds`
+          `Submitting quiz completion with earned points: ${earnedPoints}, total points: ${totalPoints}`
         );
 
         // Normalize scores in user answers to ensure none exceed 100%
@@ -151,11 +192,11 @@ const QuizResults = () => {
         const quizCompletionData = {
           userId: userId,
           quizId: quizId,
-          score: normalisedPercentCorrect, // Use normalized percentage
+          score: percentCorrect, // Use calculated percentage
           totalQuestions: totalQuestions,
-          correctAnswers: score,
-          earnedPoints: earnedPoints,
-          totalPossiblePoints: totalPossiblePoints,
+          correctAnswers: correctAnswers, // Use calculated correct answers
+          earnedPoints: earnedPoints, // Include earned points
+          totalPossiblePoints: totalPoints, // Include total possible points
           duration: duration || 0, // Include quiz duration in seconds
           completionDetails: userAnswers.map((answer, index) => ({
             questionIndex: index,
@@ -170,7 +211,9 @@ const QuizResults = () => {
               answer.details?.earnedPoints || (answer.isCorrect ? 10 : 0),
             possiblePoints: answer.details?.maxPoints || 10,
           })),
-          submissionId: submissionId, // Add unique submission ID
+          submissionId: `${userId}-${quizId}-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 10)}`, // Add unique submission ID
         };
 
         const response = await fetch(API_ENDPOINTS.COMPLETE_QUIZ, {
@@ -400,9 +443,14 @@ const QuizResults = () => {
 
           <div className="score-details">
             <p className="score-text">
-              You scored <span className="score-value">{score}</span> correct
-              answers out of{" "}
+              You scored <span className="score-value">{correctAnswers}</span>{" "}
+              correct answers out of{" "}
               <span className="total-value">{totalQuestions}</span> questions
+            </p>
+            <p className="points-text">
+              <span className="points-value">{earnedPoints}</span> points earned
+              out of <span className="points-total">{totalPoints}</span>{" "}
+              possible points
             </p>
             <p className={`status-text ${passed ? "passed" : "failed"}`}>
               {passed ? "PASSED" : "FAILED"}
@@ -569,6 +617,18 @@ const QuizResults = () => {
           font-size: 1.2rem;
           color: #e0e0e0;
           margin-bottom: 0.5rem;
+        }
+
+        .points-text {
+          font-size: 1rem;
+          color: #b3b3b3;
+          margin-bottom: 0.75rem;
+        }
+
+        .points-value,
+        .points-total {
+          font-weight: bold;
+          color: #3498db;
         }
 
         .score-value,
