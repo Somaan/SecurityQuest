@@ -19,7 +19,7 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
       
-      // Get user stats
+      // Get user stats from 'users'
       const userStats = await pool.query(`
         SELECT 
           u.login_streak,
@@ -34,7 +34,7 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
       
       const stats = userStats.rows[0];
       
-      // First, get all achievements from the database
+      // First, extract all achievements from the database
       const achievementsResult = await pool.query(`
         SELECT id, title, description, icon, color, achievement_type
         FROM achievements
@@ -74,9 +74,8 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
           progress = userAchievementsMap[achievement.id].progress;
           unlockDate = userAchievementsMap[achievement.id].unlockDate;
         } else {
-          // Calculate achievement status based on user stats
-          // This handles cases where we haven't yet created entries in user_achievements
-          
+        
+          // Calculate achievement status based on user stats  
           switch(achievement.achievement_type) {
             case 'login_streak':
               if (achievement.title === 'Dedicated User') {
@@ -123,8 +122,6 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
                 progress = Math.min(100, (stats.total_logins / 10) * 100);
               }
               break;
-              
-            // Handling for Security Champion will need a separate leaderboard check
           }
           
           // If we've just determined that an achievement is unlocked, save it
@@ -146,7 +143,7 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
               console.error('Error updating achievement status:', error);
             }
           }
-          // If not unlocked but has progress, save the progress
+          // If not unlocked but progress is seen, save the progress
           else if (progress > 0) {
             try {
               pool.query(`
@@ -175,7 +172,7 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
         };
       });
       
-      // For Security Champion achievement, check leaderboard position
+      // Determine Security Champion
       try {
         // Get top user from leaderboard
         const topUserResult = await pool.query(`
@@ -209,7 +206,6 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
           }
         } else {
           // If not top of leaderboard, update progress proportionally
-          // For simplicity, we'll just set it to a partial value
           const securityChampion = achievements.find(a => a.title === 'Security Champion');
           if (securityChampion && !securityChampion.unlocked) {
             securityChampion.progress = 25; // Arbitrary partial progress
@@ -350,7 +346,7 @@ app.get('/api/users/:userId/threat-performance', async (req, res) => {
     }
 });
 
-// Get user's improvement over time for threat identification
+// Get user's improvement over time from threat-performance endpoint
 app.get('/api/users/:userId/threat-progress', async (req, res) => {
     const userId = req.params.userId;
     

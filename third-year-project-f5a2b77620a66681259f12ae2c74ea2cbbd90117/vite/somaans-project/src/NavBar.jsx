@@ -264,7 +264,7 @@ const Navbar = () => {
         }
 
         .nav-brand {
-          padding: 15px 10px;
+          padding: 15px 1px;
           display: flex;
           align-items: center;
           justify-content: flex-start;
