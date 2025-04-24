@@ -1,25 +1,30 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import validator from "validator";
 import { toast } from "react-toastify";
-import CAPTCHA from './CAPTCHA';
-import 'react-toastify/dist/ReactToastify.css';
-import { ROUTES } from './Routes';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRightToBracket, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
+import CAPTCHA from "./CAPTCHA";
+import "react-toastify/dist/ReactToastify.css";
+import { ROUTES } from "./Routes";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faRightToBracket,
+  faEye,
+  faEyeSlash,
+} from "@fortawesome/free-solid-svg-icons";
 
 const Register = () => {
   const navigate = useNavigate();
   const [showCaptcha, setShowCaptcha] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [showPasswordRequirements, setShowPasswordRequirements] =
+    useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const [emailError, setEmailError] = useState(false);
@@ -30,14 +35,14 @@ const Register = () => {
   const passwordPatterns = {
     minLength: /.{10,}/,
     minNumber: /\d/,
-    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/,
   };
 
   //password requirements states
   const [passwordRequirements, setPasswordRequirements] = useState({
     minLength: false,
     minNumber: false,
-    hasSpecial: false
+    hasSpecial: false,
   });
 
   //checking password against regex reqs
@@ -45,111 +50,113 @@ const Register = () => {
     setPasswordRequirements({
       minLength: passwordPatterns.minLength.test(password),
       minNumber: passwordPatterns.minNumber.test(password),
-      hasSpecial: passwordPatterns.hasSpecial.test(password)
+      hasSpecial: passwordPatterns.hasSpecial.test(password),
     });
   };
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-    
-    if (name === 'email') {
+
+    if (name === "email") {
       const isValid = validator.isEmail(value);
-      setFormData(prevData => ({
+      setFormData((prevData) => ({
         ...prevData,
-        [name]: value
+        [name]: value,
       }));
-      setEmailError(!isValid && value !== '');
-      setEmailValid(isValid && value !== '');
-    } else if (name === 'password') {
+      setEmailError(!isValid && value !== "");
+      setEmailValid(isValid && value !== "");
+    } else if (name === "password") {
       if (value.length <= MAX_LENGTH) {
-        setFormData(prevData => ({
+        setFormData((prevData) => ({
           ...prevData,
-          [name]: value
+          [name]: value,
         }));
         checkPasswordRequirements(value);
       }
     } else if (value.length <= MAX_LENGTH) {
-      setFormData(prevData => ({
+      setFormData((prevData) => ({
         ...prevData,
-        [name]: value
+        [name]: value,
       }));
     }
-};
+  };
 
   const validateForm = () => {
-    if (!formData.username || !formData.email || !formData.password || !formData.confirmPassword) {
-      toast.error('Please fill in all fields');
+    if (
+      !formData.username ||
+      !formData.email ||
+      !formData.password ||
+      !formData.confirmPassword
+    ) {
+      toast.error("Please fill in all fields");
       return false;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match!');
+      toast.error("Passwords do not match!");
       return false;
     }
 
     if (!emailValid) {
-      toast.error('Please enter a valid email address');
+      toast.error("Please enter a valid email address");
       return false;
     }
 
-
     //checking if all reqs are met
-    const isPasswordValid = Object.entries(passwordPatterns).every(([key, pattern]) =>
-      pattern.test(formData.password)
-  );
+    const isPasswordValid = Object.entries(passwordPatterns).every(
+      ([key, pattern]) => pattern.test(formData.password)
+    );
 
-  if (!isPasswordValid) {
-    toast.error('Password does not meet all requirements');
-    return false;
-  }
+    if (!isPasswordValid) {
+      toast.error("Password does not meet all requirements");
+      return false;
+    }
 
     return true;
-};
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       //API call
-      const response = await fetch('http://localhost:5000/api/register', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/api/register", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username: formData.username,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Registration Failed');
+        throw new Error(data.error || "Registration Failed");
       }
 
-    // Simulate API call delay
-    setTimeout(() => {
+      // Simulate API call delay
+      setTimeout(() => {
+        setIsLoading(false);
+        setShowCaptcha(true);
+      }, 1500);
+    } catch (error) {
       setIsLoading(false);
-      setShowCaptcha(true);
-    }, 1500);
-
-
-  } catch (error) {
-    setIsLoading(false);
-    toast.error(error.message);
-  }
-};
+      toast.error(error.message);
+    }
+  };
   const handleCaptchaSuccess = () => {
-    sessionStorage.setItem('isAuthenticated', 'true');
-    sessionStorage.setItem('username', formData.username);
+    sessionStorage.setItem("isAuthenticated", "true");
+    sessionStorage.setItem("username", formData.username);
     toast.success("Login successful!", {
       position: "top-center",
       autoClose: 2000,
@@ -160,17 +167,17 @@ const Register = () => {
       theme: "dark",
       onClose: () => {
         resetAllFields();
-      window.location.href = ROUTES.DASHBOARD;
-      }
+        window.location.href = ROUTES.DASHBOARD;
+      },
     });
   };
 
   const resetAllFields = () => {
     setFormData({
-      username: '',
-      email: '',
-      password: '',
-      confirmPassword: ''
+      username: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
     });
     setEmailError(false);
     setEmailValid(false);
@@ -181,11 +188,18 @@ const Register = () => {
       {!showCaptcha ? (
         <>
           <div className="sidebar">
+            <div classname="nav-brand">
+              <img
+                src="src/assets/logo.svg"
+                alt="SecurityQuest"
+                className="nav-logo"
+              />
+            </div>
             <h3 className="sidebar-title">Register a new account here</h3>
           </div>
           <div className="content-wrapper">
             <div className="register-form-container">
-              <h2>Create Account</h2>
+              <h2>Registration Form</h2>
               <form className="login-form" onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label className="form-label" htmlFor="username">
@@ -218,7 +232,9 @@ const Register = () => {
                       id="email"
                       name="email"
                       placeholder="Enter your email"
-                      className={`form-input ${emailError ? 'invalid' : ''} ${emailValid ? 'valid' : ''}`}
+                      className={`form-input ${emailError ? "invalid" : ""} ${
+                        emailValid ? "valid" : ""
+                      }`}
                       value={formData.email}
                       onChange={handleInputChange}
                       required
@@ -249,14 +265,16 @@ const Register = () => {
                       onBlur={() => setShowPasswordRequirements(false)}
                       required
                     />
-                    <button 
-                      type="button" 
-                      className="toggle-password-btn" 
+                    <button
+                      type="button"
+                      className="toggle-password-btn"
                       onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
                     >
-                      <FontAwesomeIcon 
-                        icon={showPassword ? faEye : faEyeSlash} 
+                      <FontAwesomeIcon
+                        icon={showPassword ? faEye : faEyeSlash}
                         style={{ color: "#ffffff" }}
                       />
                     </button>
@@ -266,13 +284,31 @@ const Register = () => {
                     {showPasswordRequirements && (
                       <div className="password-requirements-dropdown">
                         <ul>
-                          <li className={passwordRequirements.minLength ? 'requirements-met' : 'requirements-not-met'}>
+                          <li
+                            className={
+                              passwordRequirements.minLength
+                                ? "requirements-met"
+                                : "requirements-not-met"
+                            }
+                          >
                             Minimum 10 characters
                           </li>
-                          <li className={passwordRequirements.minNumber ? 'requirements-met' : 'requirements-not-met'}>
+                          <li
+                            className={
+                              passwordRequirements.minNumber
+                                ? "requirements-met"
+                                : "requirements-not-met"
+                            }
+                          >
                             Contains at least one number
                           </li>
-                          <li className={passwordRequirements.hasSpecial ? 'requirements-met' : 'requirements-not-met'}>
+                          <li
+                            className={
+                              passwordRequirements.hasSpecial
+                                ? "requirements-met"
+                                : "requirements-not-met"
+                            }
+                          >
                             Contains atleast one special character
                           </li>
                         </ul>
@@ -296,14 +332,18 @@ const Register = () => {
                       onChange={handleInputChange}
                       required
                     />
-                    <button 
-                      type="button" 
-                      className="toggle-password-btn" 
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    <button
+                      type="button"
+                      className="toggle-password-btn"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      aria-label={
+                        showConfirmPassword ? "Hide password" : "Show password"
+                      }
                     >
-                      <FontAwesomeIcon 
-                        icon={showConfirmPassword ? faEye : faEyeSlash} 
+                      <FontAwesomeIcon
+                        icon={showConfirmPassword ? faEye : faEyeSlash}
                         style={{ color: "#ffffff" }}
                       />
                     </button>
@@ -313,34 +353,44 @@ const Register = () => {
                   </div>
                 </div>
 
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="login-btn register-btn"
                   disabled={isLoading}
                   style={{
-                    position: 'relative',
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    opacity: isLoading ? 0.7 : 1
+                    position: "relative",
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                    opacity: isLoading ? 0.7 : 1,
                   }}
                 >
                   {isLoading ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                      <span 
-                        style={{ 
-                          width: '20px', 
-                          height: '20px', 
-                          border: '3px solid #ffffff',
-                          borderTop: '3px solid transparent',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite'
-                        }} 
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "20px",
+                          height: "20px",
+                          border: "3px solid #ffffff",
+                          borderTop: "3px solid transparent",
+                          borderRadius: "50%",
+                          animation: "spin 1s linear infinite",
+                        }}
                       />
                       Verifying...
                     </div>
                   ) : (
                     <>
                       <span>Sign Up</span>
-                      <FontAwesomeIcon icon={faRightToBracket} className="login-icon" />
+                      <FontAwesomeIcon
+                        icon={faRightToBracket}
+                        className="login-icon"
+                      />
                     </>
                   )}
                 </button>
@@ -416,11 +466,35 @@ const Register = () => {
                       font-size: 0.9rem;
                       color: #666;
                     }
+                    .nav-brand {
+                    padding: 50px 1px 15px 1px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    }
+                    .nav-logo {
+                    height: 95px;
+                    width: auto;
+                    max-width: 100%;
+                    display: block; 
+                    }
+                    .sidebar-title {
+                    font-size: 18px;
+                    margin-top: 30px;
+                    margin-bottom: 30px
+                    width: 100%;
+                    padding: 0 10px;
+                    text-align: center;
+                    display: block;
+                    }
                   `}
                 </style>
                 <div className="register-container">
                   <span>Already have an account? </span>
-                  <Link to={ROUTES.LOGIN} className="register-link">Login here</Link>
+                  <Link to={ROUTES.LOGIN} className="register-link">
+                    Login here
+                  </Link>
                 </div>
               </form>
             </div>

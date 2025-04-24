@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-import { ROUTES } from './Routes';
+import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify";
+import { ROUTES } from "./Routes";
 
 /** 
 - Implements a custom image-based CAPTCHA system
@@ -13,20 +13,20 @@ const CAPTCHA = ({ onSuccess }) => {
 
   // Available bus images - Fix the paths to look in the right location
   const busImages = [
-    '/images/bus1.jpg',
-    '/images/bus2.jpg',
-    '/images/bus3.jpg',
-    '/images/bus4.jpg',
-    '/images/bus5.jpg'
+    "/images/bus1.jpg",
+    "/images/bus2.jpg",
+    "/images/bus3.jpg",
+    "/images/bus4.jpg",
+    "/images/bus5.jpg",
   ];
 
   // Array to define correct cells in CAPTCHA
   const correctCellsMap = [
-    new Set([4, 5, 6, 7, 8]), 
-    new Set([0, 1, 3, 4]),    
-    new Set([2, 3, 4, 5, 8]),  
+    new Set([4, 5, 6, 7, 8]),
+    new Set([0, 1, 3, 4]),
+    new Set([2, 3, 4, 5, 8]),
     new Set([4, 5, 7, 8]),
-    new Set([0, 3, 6])
+    new Set([0, 3, 6]),
   ];
 
   // Randomize image
@@ -42,30 +42,23 @@ const CAPTCHA = ({ onSuccess }) => {
 
   const handleVerify = (e) => {
     e.preventDefault();
-    
+
     const currentCorrectCells = correctCellsMap[currentImageIndex];
-    const isCorrect = selectedCells.size === currentCorrectCells.size && 
-      [...selectedCells].every(cell => currentCorrectCells.has(cell));
-    
+    const isCorrect =
+      selectedCells.size === currentCorrectCells.size &&
+      [...selectedCells].every((cell) => currentCorrectCells.has(cell));
+
     if (isCorrect) {
       // Set authentication in session storage
-      sessionStorage.setItem('isAuthenticated', 'true');
-      sessionStorage.setItem('username', sessionStorage.getItem('username') || 'User');
-      
-      // Show success toast
-      toast.success("Login successful!", {
-        position: "top-center",
-        autoClose: 1500,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: "dark"
-      });
-      
+      sessionStorage.setItem("isAuthenticated", "true");
+      sessionStorage.setItem(
+        "username",
+        sessionStorage.getItem("username") || "User"
+      );
+
       // Redirect to dashboard immediately
       window.location.href = ROUTES.DASHBOARD;
-      
+
       // Also call the onSuccess callback if needed
       if (onSuccess) onSuccess();
     } else {
@@ -76,7 +69,7 @@ const CAPTCHA = ({ onSuccess }) => {
         closeOnClick: true,
         pauseOnHover: true,
         draggable: true,
-        theme: "dark"
+        theme: "dark",
       });
       setSelectedCells(new Set());
       getRandomImage(); // new image on incorrect instance
@@ -90,10 +83,9 @@ const CAPTCHA = ({ onSuccess }) => {
         <div className="captcha-header">
           <p className="captcha-title">Select all images that includes:</p>
           <p className="captcha-subtitle">A bus</p>
-          
         </div>
         <div className="captcha-image-container">
-          <img 
+          <img
             src={busImages[currentImageIndex]}
             alt="CAPTCHA"
             className="captcha-image"
@@ -102,7 +94,9 @@ const CAPTCHA = ({ onSuccess }) => {
             {[...Array(9)].map((_, index) => (
               <div
                 key={index}
-                className={`captcha-cell ${selectedCells.has(index) ? 'selected' : ''}`}
+                className={`captcha-cell ${
+                  selectedCells.has(index) ? "selected" : ""
+                }`}
                 onClick={() => {
                   const newSelected = new Set(selectedCells);
                   if (newSelected.has(index)) {
@@ -128,7 +122,7 @@ const CAPTCHA = ({ onSuccess }) => {
           </button>
         </div>
       </div>
-      
+
       <style>
         {`
         .captcha-container {

@@ -1,0 +1,73 @@
+/* themes.css - Only Light Theme Variables */
+
+/* Light Theme Variables */
+.light-theme {
+    /* Main colors */
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e9ecef;
+    --text-primary: #333333;
+    --text-secondary: #555555;
+    --text-muted: #6c757d;
+    
+    /* Sidebar colors */
+    --bg-sidebar: #f0f4f8;
+    --bg-sidebar-hover: #e1e5e9;
+    --bg-submenu: #e1e5e9;
+    --text-sidebar: #495057;
+    --text-sidebar-hover: #212529;
+    --shadow-sidebar: 2px 0 5px rgba(0, 0, 0, 0.05);
+    
+    /* Accent colors - keep the same for consistency */
+    --accent-primary: #646cff;
+    --accent-secondary: #535bf2;
+    --accent-tertiary: #3498db;
+    --text-on-accent: white;
+    
+    /* Form and input colors */
+    --input-bg: #ffffff;
+    --input-bg-focus: #f0f0f0;
+    --input-border: #ced4da;
+    --input-text: #333333;
+    --input-placeholder: #adb5bd;
+    
+    /* Card and container colors */
+    --card-bg: #ffffff;
+    --card-bg-secondary: #f8f9fa;
+    --card-border: #dee2e6;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    
+    /* Status colors */
+    --success-color: #28a745;
+    --warning-color: #fd7e14;
+    --danger-color: #dc3545;
+    --info-color: #0d6efd;
+    --success-color-light: rgba(40, 167, 69, 0.2);
+    --warning-color-light: rgba(253, 126, 20, 0.2);
+    --danger-color-light: rgba(220, 53, 69, 0.2);
+    --info-color-light: rgba(13, 110, 253, 0.2);
+    --danger-color-hover: #b02a37;
+    
+    /* Border colors */
+    --border-color: rgba(0, 0, 0, 0.1);
+    --border-color-light: rgba(0, 0, 0, 0.05);
+    
+    /* Button colors */
+    --btn-primary-bg: #646cff;
+    --btn-primary-bg-hover: #535bf2;
+    --btn-primary-text: white;
+    --btn-secondary-bg: #6c757d;
+    --btn-secondary-bg-hover: #5c636a;
+    --btn-secondary-text: white;
+    
+    /* Quiz specific colors */
+    --correct-color: #28a745;
+    --incorrect-color: #dc3545;
+    --neutral-color: #6c757d;
+    --quiz-progress-bar: #dee2e6;
+    --quiz-progress-fill: #28a745;
+    
+    /* Achievement colors */
+    --achievement-border: #646cff;
+    --achievement-shadow: rgba(100, 108, 255, 0.2);
+  }

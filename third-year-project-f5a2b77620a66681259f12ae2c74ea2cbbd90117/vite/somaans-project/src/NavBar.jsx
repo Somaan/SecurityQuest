@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// NavBar.jsx with Theme Toggle
+import React, { useState, useEffect, useContext } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ROUTES } from "./Routes";
@@ -16,12 +17,16 @@ import {
   faChevronUp,
   faList,
   faCheckSquare,
+  faSun,
+  faMoon,
 } from "@fortawesome/free-solid-svg-icons";
+import { ThemeContext } from "./ThemeContext";
 
 const Navbar = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [quizSubmenuOpen, setQuizSubmenuOpen] = useState(false);
+  const { theme, toggleTheme } = useContext(ThemeContext);
 
   // Check if current route is in Quiz section
   const isQuizSection = location.pathname.startsWith("/quiz");
@@ -240,6 +245,25 @@ const Navbar = () => {
           </NavLink>
         </div>
 
+        {/* Theme Toggle Button - Placed above logout button */}
+        <div className="theme-toggle-container">
+          <button
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            aria-label={`Switch to ${
+              theme === "light" ? "dark" : "light"
+            } mode`}
+          >
+            <FontAwesomeIcon
+              icon={theme === "light" ? faMoon : faSun}
+              className="theme-icon"
+            />
+            <span className="theme-label">
+              {theme === "light" ? "Dark" : "Light"} Mode
+            </span>
+          </button>
+        </div>
+
         <button className="logout-btn" onClick={handleLogout}>
           <FontAwesomeIcon icon={faLock} className="nav-icon" />
           <span className="nav-text">Logout</span>
@@ -247,7 +271,7 @@ const Navbar = () => {
       </nav>
 
       <style jsx>{`
-        /* Desktop styles */
+        /* Desktop styles - Original dark theme styles */
         .sidebar {
           width: 200px;
           background-color: #2c3e50;
@@ -261,6 +285,13 @@ const Navbar = () => {
           box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
           padding: 0;
           z-index: 100;
+        }
+
+        /* Light theme overrides */
+        .light-theme .sidebar {
+          background-color: #f0f4f8;
+          color: #495057;
+          box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
         }
 
         .nav-brand {
@@ -295,6 +326,13 @@ const Navbar = () => {
           transition: all 0.3s ease;
         }
 
+        /* Light theme link color */
+        .light-theme .nav-links-box > a,
+        .light-theme .nav-link-content,
+        .light-theme .logout-btn {
+          color: #495057;
+        }
+
         .nav-icon {
           width: 20px;
           text-align: center;
@@ -304,6 +342,13 @@ const Navbar = () => {
         .nav-link-content:hover {
           background-color: #34495e;
           color: #fff;
+        }
+
+        /* Light theme hover styles */
+        .light-theme .nav-links-box > a:hover,
+        .light-theme .nav-link-content:hover {
+          background-color: #e1e5e9;
+          color: #212529;
         }
 
         .nav-links-box > a.active,
@@ -335,6 +380,11 @@ const Navbar = () => {
           background-color: #243342;
         }
 
+        /* Light theme submenu background */
+        .light-theme .submenu {
+          background-color: #e1e5e9;
+        }
+
         .submenu.open {
           max-height: 300px;
         }
@@ -350,8 +400,18 @@ const Navbar = () => {
           transition: all 0.2s ease;
         }
 
+        /* Light theme submenu link color */
+        .light-theme .submenu a {
+          color: #495057;
+        }
+
         .submenu a:hover {
           background-color: #34495e;
+        }
+
+        /* Light theme submenu hover */
+        .light-theme .submenu a:hover {
+          background-color: #d4d9df;
         }
 
         .submenu a.active {
@@ -359,8 +419,46 @@ const Navbar = () => {
           color: white;
         }
 
-        .logout-btn {
+        /* Theme toggle container */
+        .theme-toggle-container {
+          display: flex;
+          justify-content: center;
+          padding: 12px 0;
           margin-top: auto;
+        }
+
+        .theme-toggle-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 20px;
+          border: none;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          background-color: #333;
+          color: #f0f0f0;
+        }
+
+        .theme-toggle-btn:hover {
+          background-color: #444;
+        }
+
+        /* Light theme toggle button */
+        .light-theme .theme-toggle-btn {
+          background-color: #e0e0e0;
+          color: #333;
+        }
+
+        .light-theme .theme-toggle-btn:hover {
+          background-color: #d0d0d0;
+        }
+
+        .theme-icon {
+          font-size: 1rem;
+        }
+
+        .logout-btn {
           margin-bottom: 20px;
           background-color: #e74c3c;
           border: none;
@@ -372,6 +470,15 @@ const Navbar = () => {
 
         .logout-btn:hover {
           background-color: #c0392b;
+        }
+
+        /* Light theme logout button */
+        .light-theme .logout-btn {
+          background-color: #dc3545;
+        }
+
+        .light-theme .logout-btn:hover {
+          background-color: #b02a37;
         }
 
         /* Mobile styles */
@@ -389,6 +496,13 @@ const Navbar = () => {
             justify-content: center;
             align-items: center;
             cursor: pointer;
+            color: #ecf0f1;
+          }
+
+          /* Light theme mobile menu toggle */
+          .light-theme .mobile-menu-toggle {
+            background-color: #f0f4f8;
+            color: #495057;
           }
 
           .mobile-menu-overlay {
@@ -427,9 +541,30 @@ const Navbar = () => {
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
           }
 
+          /* Light theme mobile borders */
+          .light-theme .nav-links-box > a,
+          .light-theme .nav-link-content,
+          .light-theme .logout-btn {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+          }
+
           .submenu a {
             padding: 15px 20px 15px 40px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          }
+
+          /* Light theme submenu mobile borders */
+          .light-theme .submenu a {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+          }
+
+          /* Hide label on small screens */
+          .theme-label {
+            display: none;
+          }
+
+          .theme-toggle-btn {
+            padding: 8px;
           }
         }
       `}</style>

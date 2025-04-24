@@ -179,7 +179,14 @@ const LoginForm = () => {
       {!showCaptcha ? (
         <>
           <div className="sidebar">
-            <h3 className="sidebar-title">SecurityQuest - Login here!</h3>
+            <div classname="nav-brand">
+              <img
+                src="src/assets/logo.svg"
+                alt="SecurityQuest"
+                className="nav-logo"
+              />
+            </div>
+            <h3 className="sidebar-title">Login here!</h3>
           </div>
           <div className="content-wrapper">
             <div className="form-container">
@@ -378,6 +385,28 @@ const LoginForm = () => {
             }
             .forgot-password-link:hover {
               text-decoration: underline;
+            }
+            .nav-brand {
+              padding: 50px 1px 15px 1px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 100px;
+            }
+            .nav-logo {
+              height: 95px;
+              width: auto;
+              max-width: 100%;
+              display: block;
+            }
+            .sidebar-title {
+              font-size: 18px;
+              margin-top: 30px;
+              margin-bottom: 30px;
+              width: 100%;
+              padding: 0 10px;
+              text-align: center;
+              display: block;
             }
           `}</style>
         </>
