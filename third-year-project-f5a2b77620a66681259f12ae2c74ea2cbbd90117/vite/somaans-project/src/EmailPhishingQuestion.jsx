@@ -9,11 +9,6 @@ import {
   faQuestionCircle,
 } from "@fortawesome/free-solid-svg-icons";
 
-/**
- * Improved EmailPhishingQuestion component with better selection mechanism
- * @param {Object} question - The question data
- * @param {Function} onAnswer - Callback when answer is submitted
- */
 const EmailPhishingQuestion = ({ question, onAnswer }) => {
   const [selectedElements, setSelectedElements] = useState([]);
   const [showExplanation, setShowExplanation] = useState(false);

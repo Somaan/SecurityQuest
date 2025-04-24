@@ -1,4 +1,3 @@
-// AchievementService.js
 import { API_ENDPOINTS } from './constants';
 
 class AchievementService {

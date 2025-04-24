@@ -1,4 +1,4 @@
-// App.jsx with Theme Provider
+// App.jsx with Theme Provider - Top notification removed
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Login from "./Login";
@@ -15,8 +15,6 @@ import Statistics from "./Statistics";
 import Leaderboard from "./Leaderboard";
 import Achievements from "./Achievements";
 import Quiz from "./Quiz";
-import AchievementNotification from "./AchievementNotification";
-import AchievementService from "./AchievementService";
 import { ThemeProvider } from "./ThemeContext";
 
 /** 
@@ -24,7 +22,6 @@ import { ThemeProvider } from "./ThemeContext";
   - Handles routing logic and authentication state management
   - Controls Access to protected and public routes
   - Checks for remembered user on initial load
-  - Manages global achievement notifications
   - Now wrapped with ThemeProvider for light/dark theme support
 */
 
@@ -40,8 +37,6 @@ function App() {
     sessionStorage.getItem("isAuthenticated") === "true"
   );
 
-  // Achievement notification state
-  const [currentAchievement, setCurrentAchievement] = useState(null);
   const userId = sessionStorage.getItem("userId") || "1";
 
   // Determine if current path is part of quiz routes to handle the NavBar visibility
@@ -80,57 +75,6 @@ function App() {
 
     checkRememberedUser();
   }, [location.pathname, isAuthenticated]);
-
-  // Periodically check for achievements if authenticated
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    // Check for new achievements immediately when user logs in
-    const checkAchievements = async () => {
-      if (!userId) return;
-
-      // Check various achievement types
-      const [newAchievements, leaderboardAchievements] = await Promise.all([
-        AchievementService.checkForNewAchievements(userId),
-        AchievementService.checkLeaderboardAchievements(userId),
-      ]);
-
-      // Queue all new achievements for display
-      [...newAchievements, ...leaderboardAchievements].forEach(
-        (achievement) => {
-          AchievementService.queueAchievement(achievement);
-        }
-      );
-
-      // Start showing achievements if not already showing one
-      if (!currentAchievement) {
-        showNextAchievement();
-      }
-    };
-
-    // Immediately check and then set up periodic checks
-    checkAchievements();
-
-    const checkInterval = setInterval(checkAchievements, 30000); // Check every 30 seconds
-
-    return () => clearInterval(checkInterval);
-  }, [isAuthenticated, userId, currentAchievement]);
-
-  // Function to display the next achievement in queue
-  const showNextAchievement = () => {
-    const nextAchievement = AchievementService.getNextAchievementToShow();
-    if (nextAchievement) {
-      setCurrentAchievement(nextAchievement);
-    }
-  };
-
-  // Handle closing the achievement notification
-  const handleCloseAchievement = () => {
-    setCurrentAchievement(null);
-
-    // Show the next achievement if there is one
-    setTimeout(showNextAchievement, 300);
-  };
 
   // Show loading state while checking authentication
   if (isAuthenticating) {
@@ -234,14 +178,6 @@ function App() {
         {/* Catch all other routes */}
         <Route path="*" element={<ErrorPage />} />
       </Routes>
-
-      {/* Achievement notification popup */}
-      {currentAchievement && (
-        <AchievementNotification
-          achievement={currentAchievement}
-          onClose={handleCloseAchievement}
-        />
-      )}
 
       <ToastContainer position="top-center" autoClose={2000} />
 

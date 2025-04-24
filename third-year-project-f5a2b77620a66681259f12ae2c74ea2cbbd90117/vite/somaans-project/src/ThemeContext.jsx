@@ -1,4 +1,3 @@
-// ThemeContext.jsx
 import React, { createContext, useState, useEffect } from "react";
 
 // Create Theme Context

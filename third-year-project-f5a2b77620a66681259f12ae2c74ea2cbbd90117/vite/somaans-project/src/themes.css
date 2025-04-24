@@ -1,73 +1,468 @@
-/* themes.css - Only Light Theme Variables */
+/* COMPLETE LIGHT THEME IMPLEMENTATION */
 
-/* Light Theme Variables */
+/* Base light theme variables */
 .light-theme {
-    /* Main colors */
-    --bg-primary: #f8f9fa;
-    --bg-secondary: #ffffff;
-    --bg-tertiary: #e9ecef;
-    --text-primary: #333333;
-    --text-secondary: #555555;
-    --text-muted: #6c757d;
-    
-    /* Sidebar colors */
-    --bg-sidebar: #f0f4f8;
-    --bg-sidebar-hover: #e1e5e9;
-    --bg-submenu: #e1e5e9;
-    --text-sidebar: #495057;
-    --text-sidebar-hover: #212529;
-    --shadow-sidebar: 2px 0 5px rgba(0, 0, 0, 0.05);
-    
-    /* Accent colors - keep the same for consistency */
-    --accent-primary: #646cff;
-    --accent-secondary: #535bf2;
-    --accent-tertiary: #3498db;
-    --text-on-accent: white;
-    
-    /* Form and input colors */
-    --input-bg: #ffffff;
-    --input-bg-focus: #f0f0f0;
-    --input-border: #ced4da;
-    --input-text: #333333;
-    --input-placeholder: #adb5bd;
-    
-    /* Card and container colors */
-    --card-bg: #ffffff;
-    --card-bg-secondary: #f8f9fa;
-    --card-border: #dee2e6;
-    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    
-    /* Status colors */
-    --success-color: #28a745;
-    --warning-color: #fd7e14;
-    --danger-color: #dc3545;
-    --info-color: #0d6efd;
-    --success-color-light: rgba(40, 167, 69, 0.2);
-    --warning-color-light: rgba(253, 126, 20, 0.2);
-    --danger-color-light: rgba(220, 53, 69, 0.2);
-    --info-color-light: rgba(13, 110, 253, 0.2);
-    --danger-color-hover: #b02a37;
-    
-    /* Border colors */
-    --border-color: rgba(0, 0, 0, 0.1);
-    --border-color-light: rgba(0, 0, 0, 0.05);
-    
-    /* Button colors */
-    --btn-primary-bg: #646cff;
-    --btn-primary-bg-hover: #535bf2;
-    --btn-primary-text: white;
-    --btn-secondary-bg: #6c757d;
-    --btn-secondary-bg-hover: #5c636a;
-    --btn-secondary-text: white;
-    
-    /* Quiz specific colors */
-    --correct-color: #28a745;
-    --incorrect-color: #dc3545;
-    --neutral-color: #6c757d;
-    --quiz-progress-bar: #dee2e6;
-    --quiz-progress-fill: #28a745;
-    
-    /* Achievement colors */
-    --achievement-border: #646cff;
-    --achievement-shadow: rgba(100, 108, 255, 0.2);
-  }
+  /* Main colors */
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f4f8;
+  --text-color: #000000; /* Pure black text */
+  --text-secondary: #495057;
+  --border-color: #dee2e6;
+  --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  
+  /* Achievement icon colors */
+  --icon-security: #e74c3c;
+  --icon-security-expert: #c0392b;
+  --icon-quiz: #f39c12;
+  --icon-quiz-champion: #e67e22;
+  --icon-quiz-master: #d35400;
+  --icon-learner: #f1c40f;
+  --icon-user: #3498db;
+  --icon-dedicated: #2980b9;
+  --icon-streak: #9b59b6;
+  
+  /* Button colors */
+  --btn-primary: #646cff;
+  --btn-primary-hover: #535bf2;
+  --btn-secondary: #f0f4f8;
+}
+
+/* CRITICAL: Force ALL text to be BLACK in light mode */
+.light-theme * {
+  color: #000000 !important;
+}
+
+/* Exceptions for specific colored icons */
+.light-theme .fa-check,
+.light-theme .fa-check-circle,
+.light-theme .success-icon {
+  color: #28a745 !important;
+}
+
+.light-theme .fa-times,
+.light-theme .fa-times-circle,
+.light-theme .error-icon {
+  color: #dc3545 !important;
+}
+
+/* Background colors */
+.light-theme body,
+.light-theme .content-wrapper,
+.light-theme .container {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Common components */
+.light-theme .card,
+.light-theme .dashboard-card,
+.light-theme .stats-card,
+.light-theme .welcome-banner,
+.light-theme .form-container,
+.light-theme .register-form-container,
+.light-theme .achievement-card,
+.light-theme .leaderboard-container,
+.light-theme .quiz-container,
+.light-theme .explanation-box,
+.light-theme .modules-card,
+.light-theme .quiz-completions-card,
+.light-theme .module-progress-card,
+.light-theme .achievements-card,
+.light-theme .activity-card,
+.light-theme .statistics-container,
+.light-theme .question-card,
+.light-theme .results-container {
+  background-color: var(--bg-secondary) !important;
+  box-shadow: var(--box-shadow) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Grey boxes for items inside cards */
+.light-theme .achievement-item,
+.light-theme .activity-item,
+.light-theme .quiz-option,
+.light-theme .recent-quiz-item,
+.light-theme .stat-item,
+.light-theme .metric-item,
+.light-theme .completion-stat,
+.light-theme .module-card,
+.light-theme .option,
+.light-theme .streak-item,
+.light-theme .difficulty-stats,
+.light-theme .stat-box,
+.light-theme .module-option,
+.light-theme .leaderboard-row {
+  background-color: var(--bg-tertiary) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--box-shadow) !important;
+}
+
+/* Make ALL text inside these boxes black */
+.light-theme .achievement-item *,
+.light-theme .activity-item *,
+.light-theme .quiz-option *,
+.light-theme .recent-quiz-item *,
+.light-theme .stat-item *,
+.light-theme .metric-item *,
+.light-theme .completion-stat *,
+.light-theme .module-card *,
+.light-theme .option *,
+.light-theme .streak-item *,
+.light-theme .stat-box * {
+  color: var(--text-color) !important;
+}
+
+/* Make stats values stand out with black */
+.light-theme .stat-number,
+.light-theme .stat-value,
+.light-theme .metric-value,
+.light-theme .score-percentage,
+.light-theme .progress-percentage,
+.light-theme .streak-value,
+.light-theme .score-value {
+  color: var(--text-color) !important;
+  font-weight: bold !important;
+}
+
+/* Navigation */
+.light-theme .sidebar {
+  background-color: var(--bg-tertiary) !important;
+  border-right: 1px solid var(--border-color) !important;
+}
+
+.light-theme .nav-links-box a {
+  color: var(--text-color) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+.light-theme .nav-links-box a:hover {
+  background-color: #e1e5e9 !important;
+}
+
+.light-theme .nav-links-box a.active {
+  background-color: var(--btn-primary) !important;
+  color: #ffffff !important;
+}
+
+.light-theme .nav-links-box a.active * {
+  color: #ffffff !important;
+}
+
+/* Forms and inputs */
+.light-theme .form-input,
+.light-theme input[type="text"],
+.light-theme input[type="email"],
+.light-theme input[type="password"],
+.light-theme select,
+.light-theme textarea {
+  background-color: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.light-theme .form-label {
+  color: var(--text-color) !important;
+}
+
+.light-theme ::placeholder {
+  color: #6c757d !important;
+  opacity: 0.8 !important;
+}
+
+/* Progress indicators */
+.light-theme .progress-bar,
+.light-theme .progress-bar-background {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.light-theme .progress-fill,
+.light-theme .progress-bar-fill {
+  background-color: var(--btn-primary) !important;
+}
+
+/* Buttons */
+.light-theme button,
+.light-theme [class*="btn"],
+.light-theme [class*="button"] {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--text-color) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.light-theme .login-btn,
+.light-theme .submit-btn,
+.light-theme .primary-btn,
+.light-theme .module-action-btn,
+.light-theme [class*="primary"] {
+  background-color: var(--btn-primary) !important;
+  border-color: var(--btn-primary-hover) !important;
+  color: #ffffff !important;
+}
+
+.light-theme .logout-btn {
+  background-color: #dc3545 !important;
+  color: #ffffff !important;
+}
+
+/* Tabs and filters */
+.light-theme .tab-btn {
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+.light-theme .tab-btn.active {
+  background-color: rgba(100, 108, 255, 0.1) !important;
+  border-bottom: 3px solid var(--btn-primary) !important;
+  color: var(--text-color) !important;
+}
+
+.light-theme .category-btn {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--text-color) !important;
+}
+
+.light-theme .category-btn.active {
+  background-color: var(--btn-primary) !important;
+  color: #ffffff !important;
+}
+
+/* Achievement notifications/popups */
+.light-theme .achievement-notification,
+.light-theme .achievement-unlocked,
+.light-theme .achievement-popup,
+.light-theme [class*="achievement-notification"],
+.light-theme [class*="achievement-unlocked"],
+.light-theme [class*="achievement-popup"],
+.light-theme [class*="achievement_notification"],
+.light-theme [class*="achievement_unlocked"],
+.light-theme [class*="achievement_popup"] {
+  background-color: var(--bg-tertiary) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Fix for object objects in achievement descriptions */
+.light-theme [class*="object Object"],
+.light-theme [class*="[object Object]"] {
+  display: none !important;
+}
+
+/* ACHIEVEMENT ICON COLORS - THE KEY FIX */
+
+/* Basic icon styling */
+.light-theme .achievement-icon,
+.light-theme [class*="achievement-icon"],
+.light-theme [class*="achievement_icon"] {
+  width: 50px !important;
+  height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  color: #ffffff !important;
+}
+
+.light-theme .achievement-icon *,
+.light-theme [class*="achievement-icon"] *,
+.light-theme [class*="achievement_icon"] * {
+  color: #ffffff !important;
+}
+
+/* Security Champion achievement */
+.light-theme div:has(> h3:contains("Security Champion")) .achievement-icon,
+.light-theme div:has(> h4:contains("Security Champion")) .achievement-icon,
+.light-theme div:has(> span:contains("Security Champion")) .achievement-icon,
+.light-theme div:has(> p:contains("#1 on leaderboard")) .achievement-icon,
+.light-theme div:contains("Security Champion") .achievement-icon {
+  background-color: var(--icon-security) !important;
+}
+
+/* Security Expert achievement */
+.light-theme div:has(> h3:contains("Security Expert")) .achievement-icon,
+.light-theme div:has(> h4:contains("Security Expert")) .achievement-icon,
+.light-theme div:has(> span:contains("Security Expert")) .achievement-icon,
+.light-theme div:contains("Security Expert") .achievement-icon {
+  background-color: var(--icon-security-expert) !important;
+}
+
+/* Quiz Champion achievement */
+.light-theme div:has(> h3:contains("Quiz Champion")) .achievement-icon,
+.light-theme div:has(> h4:contains("Quiz Champion")) .achievement-icon,
+.light-theme div:has(> span:contains("Quiz Champion")) .achievement-icon,
+.light-theme div:contains("Quiz Champion") .achievement-icon,
+.light-theme div:contains("Completed quizzes for 7 days") .achievement-icon {
+  background-color: var(--icon-quiz-champion) !important;
+}
+
+/* Quiz Enthusiast achievement */
+.light-theme div:has(> h3:contains("Quiz Enthusiast")) .achievement-icon,
+.light-theme div:has(> h4:contains("Quiz Enthusiast")) .achievement-icon,
+.light-theme div:has(> span:contains("Quiz Enthusiast")) .achievement-icon,
+.light-theme div:contains("Quiz Enthusiast") .achievement-icon,
+.light-theme div:contains("Completed quizzes for 3 days") .achievement-icon {
+  background-color: var(--icon-quiz) !important;
+}
+
+/* Quiz Master achievement */
+.light-theme div:has(> h3:contains("Quiz Master")) .achievement-icon,
+.light-theme div:has(> h4:contains("Quiz Master")) .achievement-icon,
+.light-theme div:has(> span:contains("Quiz Master")) .achievement-icon,
+.light-theme div:contains("Quiz Master") .achievement-icon,
+.light-theme div:contains("Complete 10 quizzes") .achievement-icon {
+  background-color: var(--icon-quiz-master) !important;
+}
+
+/* Quick Learner achievement */
+.light-theme div:has(> h3:contains("Quick Learner")) .achievement-icon,
+.light-theme div:has(> h4:contains("Quick Learner")) .achievement-icon,
+.light-theme div:has(> span:contains("Quick Learner")) .achievement-icon,
+.light-theme div:contains("Quick Learner") .achievement-icon,
+.light-theme div:contains("3 correct answers in a row") .achievement-icon {
+  background-color: var(--icon-learner) !important;
+}
+
+/* Rising Star achievement */
+.light-theme div:has(> h3:contains("Rising Star")) .achievement-icon,
+.light-theme div:has(> h4:contains("Rising Star")) .achievement-icon,
+.light-theme div:has(> span:contains("Rising Star")) .achievement-icon,
+.light-theme div:contains("Rising Star") .achievement-icon,
+.light-theme div:contains("Complete 5 quizzes with a score of 70%") .achievement-icon {
+  background-color: var(--icon-learner) !important;
+}
+
+/* Regular User achievement */
+.light-theme div:has(> h3:contains("Regular User")) .achievement-icon,
+.light-theme div:has(> h4:contains("Regular User")) .achievement-icon,
+.light-theme div:has(> span:contains("Regular User")) .achievement-icon,
+.light-theme div:contains("Regular User") .achievement-icon,
+.light-theme div:contains("Login 10 days in total") .achievement-icon {
+  background-color: var(--icon-user) !important;
+}
+
+/* Dedicated User achievement */
+.light-theme div:has(> h3:contains("Dedicated User")) .achievement-icon,
+.light-theme div:has(> h4:contains("Dedicated User")) .achievement-icon,
+.light-theme div:has(> span:contains("Dedicated User")) .achievement-icon,
+.light-theme div:contains("Dedicated User") .achievement-icon,
+.light-theme div:contains("Logged in for 3 days") .achievement-icon {
+  background-color: var(--icon-dedicated) !important;
+}
+
+/* Additional selectors for direct class-based targeting */
+.light-theme .achievement-icon.security-champion,
+.light-theme .security-champion .achievement-icon {
+  background-color: var(--icon-security) !important;
+}
+
+.light-theme .achievement-icon.security-expert,
+.light-theme .security-expert .achievement-icon {
+  background-color: var(--icon-security-expert) !important;
+}
+
+.light-theme .achievement-icon.quiz-champion,
+.light-theme .quiz-champion .achievement-icon {
+  background-color: var(--icon-quiz-champion) !important;
+}
+
+.light-theme .achievement-icon.quiz-enthusiast,
+.light-theme .quiz-enthusiast .achievement-icon {
+  background-color: var(--icon-quiz) !important;
+}
+
+.light-theme .achievement-icon.quiz-master,
+.light-theme .quiz-master .achievement-icon {
+  background-color: var(--icon-quiz-master) !important;
+}
+
+.light-theme .achievement-icon.quick-learner,
+.light-theme .quick-learner .achievement-icon {
+  background-color: var(--icon-learner) !important;
+}
+
+.light-theme .achievement-icon.rising-star,
+.light-theme .rising-star .achievement-icon {
+  background-color: var(--icon-learner) !important;
+}
+
+.light-theme .achievement-icon.regular-user,
+.light-theme .regular-user .achievement-icon {
+  background-color: var(--icon-user) !important;
+}
+
+.light-theme .achievement-icon.dedicated-user,
+.light-theme .dedicated-user .achievement-icon {
+  background-color: var(--icon-dedicated) !important;
+}
+
+/* Styling for rarity badges */
+.light-theme .rarity-badge {
+  color: var(--text-color) !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.light-theme .rarity-badge.common,
+.light-theme .common {
+  color: #3498db !important;
+  background-color: rgba(52, 152, 219, 0.1) !important;
+}
+
+.light-theme .rarity-badge.uncommon,
+.light-theme .uncommon {
+  color: #2ecc71 !important;
+  background-color: rgba(46, 204, 113, 0.1) !important;
+}
+
+.light-theme .rarity-badge.rare,
+.light-theme .rare {
+  color: #9b59b6 !important;
+  background-color: rgba(155, 89, 182, 0.1) !important;
+}
+
+.light-theme .rarity-badge.epic,
+.light-theme .epic {
+  color: #f39c12 !important;
+  background-color: rgba(243, 156, 18, 0.1) !important;
+}
+
+.light-theme .rarity-badge.legendary,
+.light-theme .legendary {
+  color: #e74c3c !important;
+  background-color: rgba(231, 76, 60, 0.1) !important;
+}
+
+/* Search and sort inputs for achievements */
+.light-theme [type="search"],
+.light-theme select {
+  background-color: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-color) !important;
+  border-radius: 4px !important;
+}
+
+/* Achievement progress circle */
+.light-theme .progress-circle {
+  background-color: var(--bg-tertiary) !important;
+}
+
+.light-theme .progress-circle-inner {
+  background-color: var(--bg-secondary) !important;
+}
+
+/* Loading and error states */
+.light-theme .loading-container,
+.light-theme .error-container {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-color) !important;
+}
+
+.light-theme .loading-spinner {
+  color: var(--btn-primary) !important;
+}
+
+/* Specific fix for [object Object] text */
+.light-theme [class*="object Object"],
+.light-theme span:contains("[object Object]") {
+  display: none !important;
+}

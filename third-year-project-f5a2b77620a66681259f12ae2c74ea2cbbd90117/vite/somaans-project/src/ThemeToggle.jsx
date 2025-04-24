@@ -1,4 +1,3 @@
-// ThemeToggle.jsx
 import React, { useContext } from "react";
 import { ThemeContext } from "./ThemeContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";

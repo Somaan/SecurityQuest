@@ -1,4 +1,3 @@
-// NavBar.jsx with Theme Toggle
 import React, { useState, useEffect, useContext } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -312,6 +311,9 @@ const Navbar = () => {
           display: flex;
           flex-direction: column;
           flex: 1;
+        }
+        .nav-text {
+          text: bold;
         }
 
         .nav-links-box > a,
