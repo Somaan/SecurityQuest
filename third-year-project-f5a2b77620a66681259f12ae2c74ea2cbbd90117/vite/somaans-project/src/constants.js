@@ -324,7 +324,7 @@ The Amazon Security Team
       {
         id: 6,
         type: "vishing",
-        question: "Listen to this call recording and identify what makes it a vihsing (voice phishing) attempt",
+        question: "Listen to this call recording and identify what makes it a vishing (voice phishing) attempt",
         callTranscript: `Caller: "Hello, this is Michael from Microsoft Tech Support. We've detected malicious software on your computer that's sending us alerts."
         You: "I wasn't aware of any problems." 
         Caller: "Yes, it's a serious security breach. Your personal data is at risk. I can help you fix this right away, but I'll need you to connect your computer remotely. Can you go to your computer now?"
@@ -383,42 +383,42 @@ The Amazon Security Team
           {
             id: "webElements1",
             description: "The URL shows 'bank-secure-login.com' instead of the offical bank domain",
-            coordinates: {top: 5, left: 10, width: 80, height: 8},
+            coordinates: {top: 5, left: 10, width: 70, height: 6},
             points: 10,
             isCorrect: true
           },
           {
             id: "webElement2", 
             description: "No HTTPS secure connection",
-            coordinates: {top: 5, left: 5, width: 5, height: 8},
+            coordinates: {top: 5, left: 5, width: 4, height: 6},
             points: 10,
             isCorrect: true
           },
           {
             id: "webElement3",
             description: "Mispelled bank name in the logo ('BankOne' vs 'Bank0ne')", 
-            coordinates: {top: 15, left: 40, width: 20, height: 10},
+            coordinates: {top: 12, left: 40, width: 20, height: 8},
             points: 10,
             isCorrect: true
           },
           {
             id: "webElement4",
             description: "Unusual request for full credit card number on login page",
-            coordinates: {top: 40, left: 30, width: 40, height: 10},
+            coordinates: {top: 55, left: 15, width: 70, height: 8},
             points: 10,
             isCorrect: true
           },
           {
             id: "webElement5",
             description: "Poor layout and unprofessional design compared to the real website",
-            coordinates: {top: 10, left: 10, width: 80, height: 80},
+            coordinates: {top: 55, left: 15, width: 70, height: 15},
             points: 10,
             isCorrect: true
           },
           {
             id: "webElement6",
             description: "The 'Remember Me' checkbox option",
-            coordinates: {top: 60, left: 30, width: 40, height: 5},
+            coordinates: {top: 65, left: 20, width: 30, height: 5},
             points: 0,
             isCorrect: false
           },

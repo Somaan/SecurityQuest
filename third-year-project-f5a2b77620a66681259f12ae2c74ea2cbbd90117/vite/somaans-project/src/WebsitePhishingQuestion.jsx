@@ -27,8 +27,13 @@ const WebsitePhishingQuestion = ({ question, onAnswer }) => {
   const imageRef = useRef(null);
 
   // Toggle selection of an element
-  const toggleElement = (elementId) => {
+  const toggleElement = (elementId, event) => {
     if (showExplanation) return; // Prevent changes after submission
+
+    // Stop event propagation to prevent parent elements from being clicked
+    if (event) {
+      event.stopPropagation();
+    }
 
     if (selectedElements.includes(elementId)) {
       setSelectedElements(selectedElements.filter((id) => id !== elementId));
@@ -65,11 +70,34 @@ const WebsitePhishingQuestion = ({ question, onAnswer }) => {
   };
 
   // Find which element (if any) is at the given position
+  // Modified to handle z-index properly by checking smallest elements first
   const findElementAtPosition = (x, y) => {
-    return question.suspiciousElements.find((element) => {
+    // Sort elements by size (smallest area first) to handle overlapping elements
+    const sortedElements = [...question.suspiciousElements].sort((a, b) => {
+      const areaA = a.coordinates.width * a.coordinates.height;
+      const areaB = b.coordinates.width * b.coordinates.height;
+      return areaA - areaB; // Smaller elements should be checked first
+    });
+
+    // Find the smallest element that contains the point
+    return sortedElements.find((element) => {
       const { top, left, width, height } = element.coordinates;
       return x >= left && x <= left + width && y >= top && y <= top + height;
     });
+  };
+
+  // Highlight an element when hovering over it
+  const handleElementMouseEnter = (element) => {
+    if (showExplanation) return;
+    setHoveredElement(element.id);
+    setTooltipContent(element.description);
+    setShowTooltip(true);
+  };
+
+  // Clear highlighted element
+  const handleElementMouseLeave = () => {
+    setHoveredElement(null);
+    setShowTooltip(false);
   };
 
   // Handle mouse leaving the image
@@ -135,8 +163,33 @@ const WebsitePhishingQuestion = ({ question, onAnswer }) => {
 
   // Helper function to render the selection overlays
   const renderSelectionOverlays = () => {
-    return question.suspiciousElements.map((element) => {
-      const { top, left, width, height } = element.coordinates;
+    // Process question.suspiciousElements to fix the overlapping issue
+    // Adjust coordinates for 'poor layout' to not cover other elements
+    const adjustedElements = question.suspiciousElements.map((element) => {
+      // If this is the "poor layout" element (large, contains others)
+      if (element.id === "webElement5") {
+        // Create a modified copy of the element with adjusted coordinates
+        return {
+          ...element,
+          renderedCoordinates: {
+            // Make it a border around the page that doesn't cover other elements
+            top: 10, // Keep top the same
+            left: 10, // Keep left the same
+            width: 80, // Keep width the same
+            height: 10, // Make it just a thin strip at the top
+          },
+        };
+      }
+      // For all other elements, use their original coordinates
+      return {
+        ...element,
+        renderedCoordinates: { ...element.coordinates },
+      };
+    });
+
+    return adjustedElements.map((element) => {
+      const { top, left, width, height } =
+        element.renderedCoordinates || element.coordinates;
 
       // Determine overlay styling classes
       const isSelected = selectedElements.includes(element.id);
@@ -163,8 +216,12 @@ const WebsitePhishingQuestion = ({ question, onAnswer }) => {
             left: `${left}%`,
             width: `${width}%`,
             height: `${height}%`,
+            // Add a higher z-index for smaller elements to ensure they're clickable
+            zIndex: element.id === "webElement5" ? 1 : 2,
           }}
-          onClick={() => toggleElement(element.id)}
+          onClick={(e) => toggleElement(element.id, e)}
+          onMouseEnter={() => handleElementMouseEnter(element)}
+          onMouseLeave={handleElementMouseLeave}
         >
           {isSelected && (
             <span className="selection-indicator">

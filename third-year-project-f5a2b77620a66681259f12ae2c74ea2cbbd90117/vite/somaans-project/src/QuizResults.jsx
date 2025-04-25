@@ -118,28 +118,46 @@ const QuizResults = () => {
             answer.details.earnedPoints !== undefined &&
             answer.details.maxPoints !== undefined
           ) {
-            earned += answer.details.earnedPoints;
+            // Round to nearest multiple of 5 to ensure consistent scoring
+            const roundedPoints =
+              Math.round(answer.details.earnedPoints / 5) * 5;
+            earned += roundedPoints;
             total += answer.details.maxPoints;
+
             // Count as correct if score is at least 70%
             if (answer.details.earnedPoints / answer.details.maxPoints >= 0.7) {
               correct += 1;
             }
           }
+          // Check for penalties from false positives
+          if (
+            answer.details.falsePositives &&
+            answer.details.falsePositives.length > 0
+          ) {
+            // Apply penalty for each false positive (typically -5 points per wrong selection)
+            earned -= answer.details.falsePositives.length * 5;
+          }
           // If we just have score percentage
           else if (answer.score !== undefined) {
-            const questionPoints = 10; // Default points per question
-            earned += (answer.score / 100) * questionPoints;
-            total += questionPoints;
+            // Calculate points and round to nearest multiple of 5
+            const rawPoints = (answer.score / 100) * 10;
+            const roundedPoints = Math.round(rawPoints / 5) * 5;
+            earned += roundedPoints;
+            total += 10;
+
             if (answer.score >= 70) {
               correct += 1;
             }
           }
         }
-        // If we just have score percentage
+        // If we just have score percentage but no details
         else if (answer.score !== undefined) {
-          const questionPoints = 10; // Default points per question
-          earned += (answer.score / 100) * questionPoints;
-          total += questionPoints;
+          // Calculate points and round to nearest multiple of 5
+          const rawPoints = (answer.score / 100) * 10;
+          const roundedPoints = Math.round(rawPoints / 5) * 5;
+          earned += roundedPoints;
+          total += 10;
+
           if (answer.score >= 70) {
             correct += 1;
           }
@@ -157,11 +175,14 @@ const QuizResults = () => {
       }
     });
 
+    // Ensure earned points isn't negative and rounds to nearest multiple of 5
+    earned = Math.max(0, Math.round(earned / 5) * 5);
+
+    // Round total to nearest multiple of 10 to ensure consistency
+    total = Math.round(total / 10) * 10;
+
     return [earned, total, correct];
   }
-
-  // This is the updated portion of the useEffect that handles
-  // submitting quiz results to the backend with proper timing data
 
   useEffect(() => {
     const submitQuizScore = async () => {
