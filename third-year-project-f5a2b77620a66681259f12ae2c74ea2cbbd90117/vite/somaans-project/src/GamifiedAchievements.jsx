@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faStar,
@@ -13,6 +13,8 @@ import {
   faCertificate,
   faUser,
   faQuestionCircle,
+  faFilter,
+  faChartLine,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Helper function to get FontAwesome icon by name
@@ -35,20 +37,11 @@ const getIconByName = (iconName) => {
   return iconMap[iconName.toLowerCase()] || faQuestionCircle;
 };
 
-// Category filters
-const CATEGORIES = [
-  { id: "all", label: "All" },
-  { id: "login", label: "Login" },
-  { id: "quiz", label: "Quiz" },
-  { id: "streaks", label: "Streaks" },
-  { id: "scores", label: "Scores" },
-];
-
 // Single achievement card component
 const AchievementCard = ({ achievement }) => {
-  // Safely extract values with proper type checking
+  // Safely extract values with proper type checking and fallbacks
   const {
-    id,
+    id = "",
     title = "Unknown Achievement",
     description = "",
     icon = "trophy",
@@ -56,29 +49,36 @@ const AchievementCard = ({ achievement }) => {
     rarity = "common",
     unlocked = false,
     progress = 0,
+    total = 100, // Default to 100 for percentage calculation
     unlockDate = null,
+    date = null, // Fallback date field
   } = achievement || {};
 
   // Format unlock date
-  const formattedDate = unlockDate
-    ? new Date(unlockDate).toLocaleDateString()
-    : null;
+  const formattedDate =
+    unlockDate || date
+      ? new Date(unlockDate || date).toLocaleDateString()
+      : null;
 
-  // Determine lock status for display - show icon for in-progress achievements
-  const isLocked = !unlocked && progress <= 0;
+  // Determine lock status for display
+  const isLocked = !unlocked;
   const isInProgress = !unlocked && progress > 0;
+
+  // Calculate progress percentage (safely)
+  const progressPercentage =
+    total > 0 ? Math.min(100, Math.round((progress / total) * 100)) : progress;
 
   return (
     <div
       className={`achievement-card ${rarity} ${
-        isLocked ? "locked" : isInProgress ? "in-progress" : "unlocked"
+        isLocked ? (isInProgress ? "in-progress" : "locked") : "unlocked"
       }`}
     >
       <div
         className="achievement-icon"
-        style={{ backgroundColor: isLocked ? "#555" : color }}
+        style={{ backgroundColor: isLocked && !isInProgress ? "#555" : color }}
       >
-        {isLocked ? (
+        {isLocked && !isInProgress ? (
           <FontAwesomeIcon icon={faLock} />
         ) : (
           <FontAwesomeIcon icon={getIconByName(icon)} />
@@ -88,13 +88,16 @@ const AchievementCard = ({ achievement }) => {
         <h3>{title}</h3>
         <p>{description}</p>
 
-        {/* Show progress bar for in-progress achievements */}
-        {isInProgress && (
-          <div className="progress-container">
-            <div className="progress-bar" style={{ width: `${progress}%` }} />
-            <span className="progress-text">{Math.round(progress)}%</span>
-          </div>
-        )}
+        {/* Always show progress bar */}
+        <div className="progress-container">
+          <div
+            className="progress-bar"
+            style={{ width: `${progressPercentage}%` }}
+          />
+          <span className="progress-text">
+            {progress} / {total} ({progressPercentage}%)
+          </span>
+        </div>
 
         {unlocked && (
           <div className="unlock-status">
@@ -109,34 +112,90 @@ const AchievementCard = ({ achievement }) => {
 
       {/* Rarity badge */}
       {rarity && rarity !== "common" && (
-        <div className={`rarity-badge ${rarity}`}>{rarity}</div>
+        <div className={`rarity-badge ${rarity}`}>{rarity.toUpperCase()}</div>
       )}
     </div>
   );
 };
 
 // Main GamifiedAchievements component
-const GamifiedAchievements = ({ achievements }) => {
-  const [activeCategory, setActiveCategory] = useState("all");
+const GamifiedAchievements = ({ achievements = [] }) => {
+  const [activeTab, setActiveTab] = useState("all");
+  const [displayedAchievements, setDisplayedAchievements] = useState([]);
 
-  // Safely handle achievements array
-  const safeAchievements = Array.isArray(achievements) ? achievements : [];
+  // Define category filters
+  const CATEGORIES = [
+    { id: "all", label: "All", icon: faFilter },
+    { id: "login", label: "Login", icon: faCalendarCheck },
+    { id: "quiz", label: "Quiz", icon: faQuestionCircle },
+    { id: "streaks", label: "Streaks", icon: faAward },
+    { id: "scores", label: "Scores", icon: faChartLine },
+  ];
+
+  // Ensure achievements array is valid and safe to use
+  const safeAchievements = Array.isArray(achievements)
+    ? achievements.filter((a) => a && typeof a === "object")
+    : [];
+
+  // Handle and clean potentially corrupted achievement data
+  const sanitizedAchievements = safeAchievements.map((achievement) => {
+    // Set default values for any missing fields to prevent errors
+    return {
+      id:
+        achievement.id ||
+        `achievement-${Math.random().toString(36).substr(2, 9)}`,
+      title: achievement.title || "Achievement",
+      description:
+        achievement.description ||
+        "Complete this challenge to earn this achievement",
+      icon: achievement.icon || "trophy",
+      color: achievement.color || "#646cff",
+      rarity: achievement.rarity || "common",
+      unlocked: !!achievement.unlocked,
+      progress:
+        typeof achievement.progress === "number" ? achievement.progress : 0,
+      total: typeof achievement.total === "number" ? achievement.total : 100,
+      category: achievement.category || "other",
+      unlockDate: achievement.unlockDate || achievement.date || null,
+    };
+  });
 
   // Calculate progress statistics
-  const totalAchievements = safeAchievements.length;
-  const unlockedAchievements = safeAchievements.filter(
-    (a) => a && a.unlocked
+  const totalAchievements = sanitizedAchievements.length;
+  const unlockedAchievements = sanitizedAchievements.filter(
+    (a) => a.unlocked
   ).length;
   const progressPercentage =
     totalAchievements > 0
       ? Math.round((unlockedAchievements / totalAchievements) * 100)
       : 0;
 
-  // Filter achievements by category
-  const filteredAchievements = safeAchievements.filter((achievement) => {
-    if (activeCategory === "all") return true;
-    return achievement && achievement.category === activeCategory;
-  });
+  // Update displayed achievements when category or achievements change
+  useEffect(() => {
+    // Filter by active category
+    const filtered = sanitizedAchievements.filter((achievement) => {
+      if (activeTab === "all") return true;
+      return achievement.category === activeTab;
+    });
+
+    setDisplayedAchievements(filtered);
+  }, [activeTab, sanitizedAchievements]);
+
+  // Add content for empty categories
+  const getEmptyStateContent = (category) => {
+    switch (category) {
+      case "login":
+        return "Login each day to unlock login-based achievements!";
+      case "quiz":
+        return "Complete quizzes to unlock quiz-based achievements!";
+      case "streaks":
+        return "Maintain daily activity to unlock streak-based achievements!";
+      case "scores":
+        return "Achieve high scores in quizzes to unlock score-based achievements!";
+      default:
+        return "Complete challenges to unlock achievements!";
+    }
+  };
 
   return (
     <div className="gamified-achievements">
@@ -175,9 +234,10 @@ const GamifiedAchievements = ({ achievements }) => {
         {CATEGORIES.map((category) => (
           <button
             key={category.id}
-            className={activeCategory === category.id ? "active" : ""}
-            onClick={() => setActiveCategory(category.id)}
+            className={activeTab === category.id ? "active" : ""}
+            onClick={() => setActiveTab(category.id)}
           >
+            <FontAwesomeIcon icon={category.icon} className="filter-icon" />
             {category.label}
           </button>
         ))}
@@ -185,16 +245,17 @@ const GamifiedAchievements = ({ achievements }) => {
 
       {/* Achievement grid */}
       <div className="achievements-grid">
-        {filteredAchievements.length > 0 ? (
-          filteredAchievements.map((achievement, index) => (
+        {displayedAchievements.length > 0 ? (
+          displayedAchievements.map((achievement, index) => (
             <AchievementCard
-              key={achievement.id || index}
+              key={achievement.id || `achievement-${index}`}
               achievement={achievement}
             />
           ))
         ) : (
           <div className="no-achievements">
-            <p>No achievements found in this category.</p>
+            <FontAwesomeIcon icon={faQuestionCircle} className="empty-icon" />
+            <p>{getEmptyStateContent(activeTab)}</p>
           </div>
         )}
       </div>
@@ -281,6 +342,13 @@ const GamifiedAchievements = ({ achievements }) => {
           font-size: 0.9rem;
           cursor: pointer;
           transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .filter-icon {
+          font-size: 0.9rem;
         }
 
         .achievement-filters button.active {
@@ -360,6 +428,7 @@ const GamifiedAchievements = ({ achievements }) => {
 
         .achievement-info {
           flex: 1;
+          min-width: 0;
         }
 
         .achievement-info h3 {
@@ -367,6 +436,7 @@ const GamifiedAchievements = ({ achievements }) => {
           color: #fff;
           font-size: 1.1rem;
           margin-bottom: 0.5rem;
+          word-break: break-word;
         }
 
         .achievement-info p {
@@ -374,6 +444,7 @@ const GamifiedAchievements = ({ achievements }) => {
           color: #9f9fb8;
           font-size: 0.9rem;
           margin-bottom: 0.75rem;
+          word-break: break-word;
         }
 
         .progress-container {
@@ -404,6 +475,8 @@ const GamifiedAchievements = ({ achievements }) => {
           align-items: center;
           color: #2ecc71;
           font-size: 0.9rem;
+          margin-top: 0.5rem;
+          flex-wrap: wrap;
         }
 
         .check-icon {
@@ -450,8 +523,26 @@ const GamifiedAchievements = ({ achievements }) => {
         .no-achievements {
           grid-column: 1 / -1;
           text-align: center;
-          padding: 2rem;
+          padding: 3rem;
           color: #9f9fb8;
+          background-color: #272736;
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .empty-icon {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+          opacity: 0.5;
+        }
+
+        .no-achievements p {
+          font-size: 1.1rem;
+          max-width: 80%;
+          margin: 0 auto;
         }
 
         @keyframes progress-animation {
@@ -472,6 +563,22 @@ const GamifiedAchievements = ({ achievements }) => {
 
           .achievements-grid {
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          }
+        }
+
+        @media (max-width: 480px) {
+          .achievement-filters button {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            min-width: 70px;
+          }
+
+          .filter-icon {
+            margin-right: 4px;
+          }
+
+          .achievements-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

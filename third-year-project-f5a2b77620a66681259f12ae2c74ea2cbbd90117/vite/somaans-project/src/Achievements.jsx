@@ -6,7 +6,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { API_ENDPOINTS } from "./constants";
 import { toast } from "react-toastify";
-import GamifiedAchievements from "./GamifiedAchievements"; // Import the new component
+import EnhancedGamifiedAchievements from "./EnhancedGamifiedAchievements"; // Import the new component
 import AchievementService from "./AchievementService";
 
 const Achievements = () => {
@@ -59,7 +59,7 @@ const Achievements = () => {
           );
         }
 
-        // Map the achievements to the format expected by GamifiedAchievements
+        // Map the achievements to the format expected by EnhancedGamifiedAchievements
         const formattedAchievements =
           mapAchievementsForDisplay(achievementsData);
         setAchievements(formattedAchievements);
@@ -95,7 +95,7 @@ const Achievements = () => {
     checkForStreakAchievements();
   }, [userId]);
 
-  // Function to map API achievements to the format expected by GamifiedAchievements
+  // Function to map API achievements to the format expected by EnhancedGamifiedAchievements
   const mapAchievementsForDisplay = (apiAchievements) => {
     // Make sure we're dealing with an array
     if (!Array.isArray(apiAchievements)) {
@@ -268,8 +268,8 @@ const Achievements = () => {
           </h3>
         </div>
 
-        {/* Use the new gamified achievements component */}
-        <GamifiedAchievements achievements={achievements} />
+        {/* Use the enhanced achievements component */}
+        <EnhancedGamifiedAchievements achievements={achievements} />
       </div>
 
       <style jsx>{`
