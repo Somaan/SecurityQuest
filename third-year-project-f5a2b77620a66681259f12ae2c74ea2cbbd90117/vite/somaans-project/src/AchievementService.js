@@ -49,7 +49,7 @@ class AchievementService {
     }
   }
   
-  // Check for streak-based achievements
+  // Check for streak-based achievements - FIXED with more reliable streak checking
   static async checkStreakAchievements(userId) {
     try {
       const response = await fetch(API_ENDPOINTS.GET_USER_STREAKS.replace(':userId', userId));
@@ -61,10 +61,14 @@ class AchievementService {
       const data = await response.json();
       const userData = data.userData || {};
       
+      console.log("Checking streak achievements for user:", userId);
+      console.log("Current login streak:", userData.login_streak);
+      
       const newAchievements = [];
       
-      // Check login streak achievements
-      if (userData.login_streak >= 3 && userData.login_streak < 7) {
+      // Check login streak achievements - Improved conditions
+      // Dedicated User (3-day login streak)
+      if (userData.login_streak >= 3) {
         newAchievements.push({
           id: 1, // ID from database
           title: 'Dedicated User',
@@ -73,9 +77,11 @@ class AchievementService {
           color: '#3498db',
           unlocked: true
         });
+        console.log("Added Dedicated User achievement");
       }
       
-      if (userData.login_streak >= 7 && userData.login_streak < 30) {
+      // Weekly Warrior (7-day login streak)
+      if (userData.login_streak >= 7) {
         newAchievements.push({
           id: 2, // ID from database
           title: 'Weekly Warrior',
@@ -84,8 +90,10 @@ class AchievementService {
           color: '#9b59b6',
           unlocked: true
         });
+        console.log("Added Weekly Warrior achievement");
       }
       
+      // Monthly Master (30-day login streak)
       if (userData.login_streak >= 30) {
         newAchievements.push({
           id: 3, // ID from database
@@ -95,9 +103,10 @@ class AchievementService {
           color: '#e74c3c',
           unlocked: true
         });
+        console.log("Added Monthly Master achievement");
       }
       
-      // Check quiz streak achievements
+      // Check quiz streak achievements - More reliable conditions
       if (userData.quiz_streak >= 3 && userData.quiz_streak < 7) {
         newAchievements.push({
           id: 4, // ID from database
@@ -131,10 +140,42 @@ class AchievementService {
         });
       }
       
+      // For each achievement, submit to the server to ensure it's properly saved
+      for (const achievement of newAchievements) {
+        await this.saveAchievement(userId, achievement);
+      }
+      
       return newAchievements;
     } catch (error) {
       console.error('Error checking streak achievements:', error);
       return [];
+    }
+  }
+  
+  // New method to save achievements to the server
+  static async saveAchievement(userId, achievement) {
+    try {
+      const response = await fetch(API_ENDPOINTS.GET_USER_ACHIEVEMENTS.replace(':userId', userId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          achievementId: achievement.id,
+          unlocked: true,
+          progress: 100,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to save achievement: ${achievement.title}`);
+      }
+      
+      console.log(`Successfully saved achievement: ${achievement.title}`);
+      return true;
+    } catch (error) {
+      console.error('Error saving achievement:', error);
+      return false;
     }
   }
   
@@ -203,15 +244,22 @@ class AchievementService {
     }
   }
   
-  // Queue a new achievement to be shown
+  // Queue a new achievement to be shown - Fixed to avoid duplicates
   static queueAchievement(achievement) {
+    if (!achievement || !achievement.id) {
+      console.error('Invalid achievement object:', achievement);
+      return;
+    }
+    
     if (this.shownAchievements.has(achievement.id)) {
-        return;
+      console.log(`Achievement ${achievement.id} (${achievement.title}) already shown`);
+      return;
     }
     
     // Check if this achievement is already in the queue
     const exists = this.newlyUnlockedAchievements.some(a => a.id === achievement.id);
     if (!exists) {
+      console.log(`Queueing achievement ${achievement.id} (${achievement.title}) for display`);
       this.newlyUnlockedAchievements.push(achievement);
       this.shownAchievements.add(achievement.id);
     }
@@ -229,6 +277,11 @@ class AchievementService {
   // Clear all queued achievements
   static clearAchievementQueue() {
     this.newlyUnlockedAchievements = [];
+  }
+  
+  // Reset shown achievements - useful when testing
+  static resetShownAchievements() {
+    this.shownAchievements.clear();
   }
 }
 

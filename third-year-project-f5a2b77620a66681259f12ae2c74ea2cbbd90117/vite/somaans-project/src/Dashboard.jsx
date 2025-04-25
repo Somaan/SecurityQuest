@@ -25,6 +25,8 @@ import {
 import { API_ENDPOINTS } from "./constants";
 import { toast } from "react-toastify";
 import { Link, useNavigate } from "react-router-dom";
+import AchievementService from "./AchievementService";
+// No longer importing AchievementNotification since we're only using the top notification
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -39,6 +41,8 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [showAchievementPopup, setShowAchievementPopup] = useState(false);
   const [latestAchievement, setLatestAchievement] = useState(null);
+  // States for the top notification only
+  // No states for bottom notification as we're removing it
 
   function normaliseScore(quiz) {
     if (quiz.earnedPoints !== undefined && quiz.totalPoints !== undefined) {
@@ -47,6 +51,7 @@ const Dashboard = () => {
       return Math.min(100, quiz.score);
     }
   }
+
   function getBeginner() {
     const beginnerQuizzes = quizHistory.filter((q) => q.quiz_id === 1);
     if (beginnerQuizzes.length === 0) return 0;
@@ -140,6 +145,36 @@ const Dashboard = () => {
     }
   }
 
+  // Check for new achievements - simplified to only handle top notification
+  const checkForNewAchievements = async () => {
+    try {
+      console.log("Checking for new achievements...");
+
+      // Check for streak-based achievements, but don't queue them for the bottom notification
+      const streakAchievements =
+        await AchievementService.checkStreakAchievements(userId);
+      console.log("Found streak achievements:", streakAchievements);
+
+      // We're only handling the top notification, so no need to queue for bottom notification
+      // The top notification is managed separately through setLatestAchievement
+
+      // Check for new achievements from API
+      const newAchievements = await AchievementService.checkForNewAchievements(
+        userId
+      );
+      console.log("New achievements from API:", newAchievements);
+
+      // Show in top notification system if available
+      if (newAchievements.length > 0 && !showAchievementPopup) {
+        const latestOne = newAchievements[0];
+        setLatestAchievement(latestOne);
+        setShowAchievementPopup(true);
+      }
+    } catch (err) {
+      console.error("Error checking achievements:", err);
+    }
+  };
+
   // Fetch user data, achievements, and quiz history
   useEffect(() => {
     const fetchUserData = async () => {
@@ -169,6 +204,9 @@ const Dashboard = () => {
         setUserData(streaksData.userData || {});
         setQuizHistory(streaksData.quizHistory || []);
         setAchievements(achievementsData.achievements || []);
+
+        // Check for new achievements after loading the data
+        await checkForNewAchievements();
 
         const unlockedAchievements =
           achievementsData && achievementsData.achievements
@@ -408,7 +446,7 @@ const Dashboard = () => {
                 <FontAwesomeIcon icon={faTrophy} className="stat-icon" />
                 <div className="stat-text">
                   <span className="stat-value">
-                    {recentAchievements.length}
+                    {achievements.filter((a) => a.unlocked).length}
                   </span>
                   <span className="stat-label">Achievements</span>
                 </div>
@@ -700,7 +738,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* New Achievement Popup */}
+      {/* Achievement Notification Component - Only show top one */}
       {showAchievementPopup && latestAchievement && (
         <div className="achievement-popup">
           <div className="achievement-popup-content">
@@ -1195,20 +1233,40 @@ const Dashboard = () => {
         /* Achievement Popup */
         .achievement-popup {
           position: fixed;
-          bottom: 2rem;
-          right: 2rem;
+          top: 20px;
+          right: 20px;
           z-index: 1000;
-          animation: slideIn 0.5s ease forwards;
+          opacity: 0;
+          transform: translateX(100%);
+          animation: slideIn 0.6s cubic-bezier(0.17, 0.67, 0.21, 1.69) forwards;
         }
 
         @keyframes slideIn {
-          from {
-            transform: translateX(100%);
+          0% {
             opacity: 0;
+            transform: translateX(400px) translateY(-20px);
           }
-          to {
-            transform: translateX(0);
+          50% {
             opacity: 1;
+            transform: translateX(-20px) translateY(0);
+          }
+          70% {
+            transform: translateX(10px) translateY(0);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0) translateY(0);
+          }
+        }
+
+        @keyframes slideOut {
+          0% {
+            opacity: 1;
+            transform: translateX(0);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(400px);
           }
         }
 
@@ -1222,6 +1280,32 @@ const Dashboard = () => {
           box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
           max-width: 350px;
           position: relative;
+          overflow: hidden;
+        }
+
+        .achievement-popup-content:before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: linear-gradient(
+            to right,
+            ${latestAchievement?.color || "#646cff"},
+            rgba(100, 108, 255, 0.5)
+          );
+          animation: shimmer 2s linear infinite;
+          background-size: 200% 100%;
+        }
+
+        @keyframes shimmer {
+          0% {
+            background-position: 100% 0;
+          }
+          100% {
+            background-position: -100% 0;
+          }
         }
 
         .achievement-popup-icon {
@@ -1234,6 +1318,48 @@ const Dashboard = () => {
           color: #ffffff;
           font-size: 1.5rem;
           flex-shrink: 0;
+          position: relative;
+          overflow: hidden;
+          animation: iconPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes iconPulse {
+          0% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.1);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+
+        .achievement-popup-icon:after {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: radial-gradient(
+            circle,
+            rgba(255, 255, 255, 0.3) 0%,
+            rgba(255, 255, 255, 0) 70%
+          );
+          animation: iconGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes iconGlow {
+          0% {
+            opacity: 0;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
         }
 
         .achievement-popup-details {
