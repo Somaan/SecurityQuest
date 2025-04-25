@@ -9,6 +9,7 @@ import {
   faEye,
   faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons";
+import AchievementService from "./AchievementService";
 
 /**
 - Handles user authentication and login process
@@ -19,9 +20,10 @@ import {
   - Redirect on successful login to Dashboard
   - Password visibility toggle
   - Remember Me functionality
+  - Achievement tracking on login success
  */
 
-const LoginForm = () => {
+const LoginForm = ({ onLoginSuccess }) => {
   const [showCaptcha, setShowCaptcha] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -148,15 +150,71 @@ const LoginForm = () => {
     }
   };
 
-  const handleCaptchaSuccess = () => {
+  const handleCaptchaSuccess = async () => {
+    // Store user information in session storage
     sessionStorage.setItem("isAuthenticated", "true");
     sessionStorage.setItem("username", formData.username);
 
+    let userId = "1";
     if (loginData && loginData.user && loginData.user.id) {
-      sessionStorage.setItem("userId", loginData.user.id.toString());
+      userId = loginData.user.id.toString();
     } else {
-      sessionStorage.setItem("userId", "1");
-      console.warn("UserId, not found in login response, using default");
+      console.warn("UserId not found in login response, using default");
+    }
+
+    sessionStorage.setItem("userId", userId);
+
+    // Update login streak and check for achievements
+    try {
+      // First try to update login streak via API
+      let streakUpdated = false;
+
+      try {
+        const streakResponse = await fetch(
+          `http://localhost:5000/api/users/${userId}/streak`,
+          {
+            method: "POST",
+          }
+        );
+
+        if (streakResponse.ok) {
+          const streakData = await streakResponse.json();
+          console.log("Login streak updated via API:", streakData.login_streak);
+          streakUpdated = true;
+        }
+      } catch (apiError) {
+        console.warn("API streak update failed:", apiError);
+      }
+
+      // If API fails, update locally for demo purposes
+      if (!streakUpdated) {
+        const currentStreak =
+          parseInt(localStorage.getItem(`login_streak_${userId}`)) || 0;
+        const newStreak = currentStreak + 1;
+        localStorage.setItem(`login_streak_${userId}`, newStreak);
+        console.log("Login streak updated locally:", newStreak);
+      }
+
+      // Check for achievements after login
+      console.log("Checking for achievements after login");
+      const achievements = await AchievementService.checkStreakAchievements(
+        userId
+      );
+
+      if (achievements && achievements.length > 0) {
+        console.log("New achievements unlocked:", achievements);
+        achievements.forEach((achievement) => {
+          // Queue achievements for notification
+          AchievementService.queueAchievement(achievement);
+        });
+      }
+    } catch (error) {
+      console.error("Error checking achievements:", error);
+    }
+
+    // Call the onLoginSuccess callback if provided
+    if (typeof onLoginSuccess === "function") {
+      onLoginSuccess();
     }
 
     // Show success message
@@ -179,7 +237,7 @@ const LoginForm = () => {
       {!showCaptcha ? (
         <>
           <div className="sidebar">
-            <div classname="nav-brand">
+            <div className="nav-brand">
               <img
                 src="src/assets/logo.svg"
                 alt="SecurityQuest"

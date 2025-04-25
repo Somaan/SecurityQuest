@@ -11,6 +11,8 @@ import {
   faCertificate,
   faCheck,
   faTimes,
+  faUser,
+  faQuestionCircle,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Achievement notification component that can be used globally
@@ -20,6 +22,13 @@ const AchievementNotification = ({ achievement, onClose }) => {
 
   // Start animations when component mounts
   useEffect(() => {
+    // Guard against null/undefined achievement
+    if (!achievement) {
+      console.warn("Received null or undefined achievement in notification");
+      if (onClose) onClose();
+      return;
+    }
+
     console.log("Showing achievement notification:", achievement);
 
     // Start animations with a slight delay to ensure smooth rendering
@@ -52,7 +61,7 @@ const AchievementNotification = ({ achievement, onClose }) => {
     }
 
     // If the achievement has an icon property, use it
-    if (achievement.icon) {
+    if (achievement.icon && typeof achievement.icon === "string") {
       switch (achievement.icon.toLowerCase()) {
         case "star":
           return faStar;
@@ -72,6 +81,8 @@ const AchievementNotification = ({ achievement, onClose }) => {
           return faGraduationCap;
         case "check":
           return faCheck;
+        case "user":
+          return faUser;
         default:
           return faStar;
       }
@@ -103,19 +114,26 @@ const AchievementNotification = ({ achievement, onClose }) => {
     return null;
   }
 
+  // Safely extract achievement properties with defaults
+  const {
+    title = "Achievement Unlocked",
+    description = "You've earned a new achievement!",
+    color = "#646cff",
+  } = achievement;
+
   return (
     <div className={`achievement-notification ${animationState}`}>
       <div className="achievement-content">
         <div
           className={`achievement-icon ${iconAnimation}`}
-          style={{ backgroundColor: achievement.color || "#646cff" }}
+          style={{ backgroundColor: color }}
         >
           <FontAwesomeIcon icon={getIconForAchievement(achievement)} />
         </div>
         <div className="achievement-details">
           <h3>Achievement Unlocked!</h3>
-          <h4>{achievement.title}</h4>
-          <p>{achievement.description}</p>
+          <h4>{title}</h4>
+          <p>{description}</p>
         </div>
         <button className="close-btn" onClick={onClose}>
           <FontAwesomeIcon icon={faTimes} />
@@ -255,7 +273,7 @@ const AchievementNotification = ({ achievement, onClose }) => {
           height: 3px;
           background: linear-gradient(
             to right,
-            ${achievement.color || "#646cff"},
+            ${typeof color === "string" ? color : "#646cff"},
             rgba(100, 108, 255, 0.5)
           );
           animation: shimmer 2s linear infinite;

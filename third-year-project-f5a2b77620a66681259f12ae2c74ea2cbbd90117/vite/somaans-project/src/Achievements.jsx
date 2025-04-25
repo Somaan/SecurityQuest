@@ -7,6 +7,7 @@ import {
 import { API_ENDPOINTS } from "./constants";
 import { toast } from "react-toastify";
 import GamifiedAchievements from "./GamifiedAchievements"; // Import the new component
+import AchievementService from "./AchievementService";
 
 const Achievements = () => {
   const [achievements, setAchievements] = useState([]);
@@ -21,26 +22,47 @@ const Achievements = () => {
       try {
         // Call the real API endpoint
         console.log("Fetching achievements for user:", userId);
-        const response = await fetch(
-          API_ENDPOINTS.GET_USER_ACHIEVEMENTS.replace(":userId", userId)
-        );
 
-        if (!response.ok) {
-          throw new Error("Failed to load achievements");
-        }
+        let achievementsData = [];
 
-        const data = await response.json();
-        console.log("Achievements data:", data);
-
-        if (data.success && data.achievements) {
-          // Map the API response to the format expected by GamifiedAchievements
-          const formattedAchievements = mapAchievementsForDisplay(
-            data.achievements
+        // Try API fetch first
+        try {
+          const response = await fetch(
+            API_ENDPOINTS.GET_USER_ACHIEVEMENTS.replace(":userId", userId)
           );
-          setAchievements(formattedAchievements);
-        } else {
-          throw new Error("Invalid achievement data format");
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log("Achievements data:", data);
+
+            if (data.success && Array.isArray(data.achievements)) {
+              achievementsData = data.achievements;
+            } else {
+              console.warn("Invalid achievement data format from API");
+            }
+          } else {
+            throw new Error("Failed to load achievements from API");
+          }
+        } catch (apiError) {
+          console.warn("API fetch failed, using fallback:", apiError.message);
+          // Fallback to AchievementService getAllAchievements which includes localStorage
+          achievementsData = await AchievementService.getAllAchievements(
+            userId
+          );
         }
+
+        // If no achievements found, try local storage
+        if (achievementsData.length === 0) {
+          console.log("No achievements found, using fallback data");
+          achievementsData = await AchievementService.getAllAchievements(
+            userId
+          );
+        }
+
+        // Map the achievements to the format expected by GamifiedAchievements
+        const formattedAchievements =
+          mapAchievementsForDisplay(achievementsData);
+        setAchievements(formattedAchievements);
       } catch (err) {
         console.error("Error fetching achievements:", err);
         setError(err.message);
@@ -51,6 +73,26 @@ const Achievements = () => {
     };
 
     fetchAchievements();
+
+    // Check for any streak achievements when the component loads
+    const checkForStreakAchievements = async () => {
+      try {
+        const newAchievements =
+          await AchievementService.checkStreakAchievements(userId);
+        if (newAchievements && newAchievements.length > 0) {
+          console.log("Found new streak achievements:", newAchievements);
+          toast.success(
+            `You've earned ${newAchievements.length} new achievement(s)!`
+          );
+          // Refresh achievements list
+          fetchAchievements();
+        }
+      } catch (error) {
+        console.error("Error checking streak achievements:", error);
+      }
+    };
+
+    checkForStreakAchievements();
   }, [userId]);
 
   // Function to map API achievements to the format expected by GamifiedAchievements
@@ -91,7 +133,7 @@ const Achievements = () => {
           ? achievement.description
           : "";
       const iconStr =
-        typeof achievement.icon === "string" ? achievement.icon : null;
+        typeof achievement.icon === "string" ? achievement.icon : "trophy";
       const colorStr =
         typeof achievement.color === "string" ? achievement.color : "#646cff";
 
@@ -121,27 +163,37 @@ const Achievements = () => {
       // Example logic for determining rarity and tier based on title
       if (title) {
         // Set category based on title keywords
-        if (title.includes("Login") || title.includes("User")) {
+        if (
+          title.includes("Login") ||
+          title.includes("User") ||
+          title.includes("Weekly") ||
+          title.includes("Monthly") ||
+          title.includes("Dedicated")
+        ) {
           category = "login";
         } else if (title.includes("Quiz")) {
           category = "quiz";
         } else if (title.includes("Streak")) {
-          category = "streak";
+          category = "streaks";
         } else if (title.includes("Score") || title.includes("Perfect")) {
-          category = "score";
+          category = "scores";
         }
 
         // Set rarity and tier based on title keywords
-        if (title.includes("Expert") || title.includes("Security Expert")) {
+        if (title === "Security Expert") {
           rarity = "legendary";
           tier = 4;
-        } else if (title.includes("Champion") || title.includes("Master")) {
-          rarity = title.includes("Security Champion") ? "epic" : "rare";
-          tier = title.includes("Security Champion") ? 3 : 2;
-        } else if (title.includes("Star") || title.includes("Rising Star")) {
-          rarity = "uncommon";
-          tier = 2;
-        } else if (title.includes("Weekly") || title.includes("Enthusiast")) {
+        } else if (title === "Security Champion") {
+          rarity = "epic";
+          tier = 3;
+        } else if (title === "Monthly Master" || title === "Quiz Champion") {
+          rarity = "rare";
+          tier = 3;
+        } else if (
+          title === "Weekly Warrior" ||
+          title === "Quiz Enthusiast" ||
+          title === "Rising Star"
+        ) {
           rarity = "uncommon";
           tier = 2;
         }
@@ -211,8 +263,8 @@ const Achievements = () => {
         <div className="achievements-header">
           <h2>Let's see what achievements you've received, {username}</h2>
           <h3>
-            As you complete quizzes, you will be able to view your achievements
-            here.
+            As you complete quizzes and login each day, you will be able to view
+            your achievements here.
           </h3>
         </div>
 
