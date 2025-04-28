@@ -14,9 +14,13 @@ import {
   faFireFlameSimple,
   faExclamationTriangle,
   faInfoCircle,
+  faBrain,
+  faLightbulb,
 } from "@fortawesome/free-solid-svg-icons";
 import { toast } from "react-toastify";
 import { API_ENDPOINTS, QUIZ_CONFIG } from "./constants";
+import OllamaFeedback from "./OllamaFeedback";
+import OllamaService from "./OllamaService";
 
 // Helper function to get display name for question types
 export const getQuestionTypeDisplay = (type) => {
@@ -35,7 +39,7 @@ export const getQuestionTypeDisplay = (type) => {
   }
 };
 
-// Helper function to calculate normalized percentage score
+// Helper function to calculate normalised percentage score
 const calculatePercentScore = (score, totalQuestions) => {
   if (totalQuestions === 0) return 0;
 
@@ -57,6 +61,9 @@ const QuizResults = () => {
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   const [scoreSubmitted, setScoreSubmitted] = useState(false);
   const [duplicateEntry, setDuplicateEntry] = useState(false);
+  const [showAIFeedback, setShowAIFeedback] = useState(false);
+  const [ollamaAvailable, setOllamaAvailable] = useState(false);
+  const [checkingOllama, setCheckingOllama] = useState(false);
 
   // Add a ref to track if submission has been attempted
   const submissionAttemptedRef = useRef(false);
@@ -88,13 +95,35 @@ const QuizResults = () => {
   const [earnedPoints, totalPoints, correctAnswers] =
     calculateScoreDetails(userAnswers);
 
-  // Calculate percentages for the statistics (normalized to 0-100%)
+  // Calculate percentages for the statistics (normalised to 0-100%)
   // Use our calculated values rather than the passed score
   const percentCorrect =
     totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
   // Determine pass/fail status based on config threshold
   const passed = percentCorrect >= (QUIZ_CONFIG.PASS_THRESHOLD || 70);
+
+  // Check if Ollama is available when component loads
+  useEffect(() => {
+    const checkOllamaAvailability = async () => {
+      setCheckingOllama(true);
+      try {
+        const available = await OllamaService.isAvailable();
+        setOllamaAvailable(available);
+        console.log(
+          "Ollama availability check:",
+          available ? "Available" : "Not available"
+        );
+      } catch (error) {
+        console.error("Error checking Ollama availability:", error);
+        setOllamaAvailable(false);
+      } finally {
+        setCheckingOllama(false);
+      }
+    };
+
+    checkOllamaAvailability();
+  }, []);
 
   // Function to calculate score details from userAnswers
   function calculateScoreDetails(answers) {
@@ -204,8 +233,8 @@ const QuizResults = () => {
           `Submitting quiz completion with earned points: ${earnedPoints}, total points: ${totalPoints}`
         );
 
-        // Normalize scores in user answers to ensure none exceed 100%
-        const normalizedUserAnswers = userAnswers.map((answer) => ({
+        // Normalise scores in user answers to ensure none exceed 100%
+        const normalisedUserAnswers = userAnswers.map((answer) => ({
           ...answer,
           score: Math.min(100, answer.score || 0),
         }));
@@ -442,6 +471,11 @@ const QuizResults = () => {
     );
   };
 
+  // Toggle AI feedback visibility
+  const toggleAIFeedback = () => {
+    setShowAIFeedback(!showAIFeedback);
+  };
+
   return (
     <div className="results-container">
       <div className="results-header">
@@ -508,22 +542,43 @@ const QuizResults = () => {
         </div>
       </div>
 
-      {/* Loading indicator for achievements */}
-      {loadingAchievements && (
-        <div className="loading-section">
-          <FontAwesomeIcon icon={faSpinner} spin />
-          <span>Loading achievements...</span>
-        </div>
-      )}
-
-      {/* Streak update indicator */}
-      {passed && (
-        <div className="streak-update-section">
-          <div className="streak-badge">
-            <FontAwesomeIcon icon={faFireFlameSimple} className="streak-icon" />
-            <span>Quiz streak increased!</span>
+      {/* AI Feedback Button */}
+      <div className="ai-feedback-section">
+        <button
+          className="ai-feedback-btn"
+          onClick={toggleAIFeedback}
+          disabled={checkingOllama}
+        >
+          {checkingOllama ? (
+            <>
+              <FontAwesomeIcon icon={faSpinner} spin />
+              Checking AI availability...
+            </>
+          ) : (
+            <>
+              <FontAwesomeIcon icon={faBrain} />
+              {showAIFeedback
+                ? "Hide AI Analysis"
+                : "Show Personalised Learning Recommendations"}
+            </>
+          )}
+        </button>
+        {ollamaAvailable === false && !checkingOllama && (
+          <div className="ai-status-message">
+            <FontAwesomeIcon icon={faInfoCircle} />
+            AI feedback is currently unavailable. See setup guide for
+            instructions.
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* AI Feedback Component */}
+      {showAIFeedback && (
+        <OllamaFeedback
+          userAnswers={userAnswers}
+          difficulty={difficulty}
+          onClose={toggleAIFeedback}
+        />
       )}
 
       <div className="results-content">
@@ -596,6 +651,52 @@ const QuizResults = () => {
           border-radius: 14px;
           padding: 2rem;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        /* AI Feedback Button section styling */
+        .ai-feedback-section {
+          background-color: #272736;
+          border-radius: 8px;
+          padding: 1rem;
+          margin: 1.5rem 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .ai-feedback-btn {
+          background-color: #3a3a6a;
+          color: white;
+          border: none;
+          padding: 0.75rem 1.5rem;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          font-size: 1rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .ai-feedback-btn:hover:not(:disabled) {
+          background-color: #4a4a8a;
+          transform: translateY(-2px);
+        }
+
+        .ai-feedback-btn:disabled {
+          background-color: #3a3a5a;
+          cursor: not-allowed;
+          opacity: 0.7;
+        }
+
+        .ai-status-message {
+          color: #95a5a6;
+          font-size: 0.9rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
         }
 
         .score-summary {

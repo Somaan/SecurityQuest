@@ -124,28 +124,27 @@ const WebsitePhishingQuestion = ({ question, onAnswer }) => {
       (id) => !selectedElements.includes(id)
     );
 
-    // Calculate score - more sophisticated scoring for this question type
+    // Calculate score - using consistent 10 points per correct element, -5 for incorrect
     let earnedPoints = 0;
     let maxPoints = 0;
 
-    // Add up points for each correctly identified element
-    question.suspiciousElements.forEach((element) => {
-      if (element.isCorrect !== false) {
-        maxPoints += element.points || 10;
-        if (selectedElements.includes(element.id)) {
-          earnedPoints += element.points || 10;
-        }
-      } else if (selectedElements.includes(element.id)) {
-        // Penalty for selecting non-suspicious elements
-        earnedPoints -= 5;
-      }
-    });
+    // Each correctly identified element earns 10 points
+    earnedPoints += truePositives.length * 10;
+
+    // Each incorrectly identified element (false positive) deducts 5 points
+    earnedPoints -= falsePositives.length * 5;
+
+    // Ensure earned points is never negative
+    earnedPoints = Math.max(0, earnedPoints);
+
+    // Total possible points is 10 points per correct element
+    maxPoints = correctElements.length * 10;
 
     // Calculate percentage score
-    const score = Math.max(
-      0,
-      Math.min(100, Math.round((earnedPoints / maxPoints) * 100))
-    );
+    const score =
+      maxPoints > 0
+        ? Math.min(100, Math.round((earnedPoints / maxPoints) * 100))
+        : 0;
 
     setShowExplanation(true);
 
@@ -269,7 +268,7 @@ const WebsitePhishingQuestion = ({ question, onAnswer }) => {
       <div className="selection-instruction">
         <FontAwesomeIcon icon={faInfoCircle} />
         <span>
-          Click on suspicious elements in the website to identify potential
+          Click on suspicious elements in the website and identify potential
           phishing signs. Look carefully at the URL, security indicators, and
           form fields.
         </span>

@@ -445,17 +445,19 @@ const LoginForm = ({ onLoginSuccess }) => {
               text-decoration: underline;
             }
             .nav-brand {
-              padding: 50px 1px 15px 1px;
+              padding: 0;
               display: flex;
               align-items: center;
               justify-content: center;
-              width: 100px;
+              width: 100%;
+              margin-top: 0px;
             }
             .nav-logo {
-              height: 95px;
+              height: 75px;
               width: auto;
               max-width: 100%;
               display: block;
+              margin-top: 5px;
             }
             .sidebar-title {
               font-size: 18px;

@@ -100,16 +100,18 @@ const AchievementCard = ({ achievement }) => {
           <h3>{title}</h3>
           <p>{description}</p>
 
-          {/* Show progress bar for locked achievements with progress */}
+          {/* Show progress bar for locked achievements */}
           {isLocked && (
             <div className="progress-container">
-              <div
-                className="progress-bar"
-                style={{
-                  width: `${progress}%`,
-                  backgroundColor: isInProgress ? color : "#555",
-                }}
-              />
+              <div className="progress-bar-bg">
+                <div
+                  className="progress-bar-fill"
+                  style={{
+                    width: `${progress}%`,
+                    backgroundColor: progress > 0 ? color : "#555",
+                  }}
+                />
+              </div>
               <span className="progress-text">{Math.round(progress)}%</span>
             </div>
           )}
@@ -620,26 +622,28 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
         }
 
         .progress-container {
-          height: 8px;
-          background-color: #2e2e3f;
-          border-radius: 4px;
-          overflow: hidden;
-          margin-bottom: 0.5rem;
-          position: relative;
+          margin: 8px 0;
         }
 
-        .progress-bar {
+        .progress-bar-bg {
+          height: 6px;
+          background-color: #2e2e3f;
+          border-radius: 3px;
+          overflow: hidden;
+        }
+
+        .progress-bar-fill {
           height: 100%;
-          background-color: #646cff;
-          border-radius: 4px;
-          transition: width 0.8s ease-in-out;
+          border-radius: 3px;
+          transition: width 0.3s ease;
         }
 
         .progress-text {
+          font-size: 0.75rem;
           color: #9f9fb8;
-          font-size: 0.8rem;
-          margin-top: 0.25rem;
+          margin-top: 4px;
           display: block;
+          text-align: right;
         }
 
         .unlock-status {
@@ -805,4 +809,5 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
     </div>
   );
 };
+
 export default EnhancedGamifiedAchievements;

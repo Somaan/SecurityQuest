@@ -82,22 +82,27 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
     );
 
     // Calculate score
-    // Each correct identification is worth (100 / total correct elements)%
-    // Each incorrect selection reduces score by half that value
-    const pointsPerCorrect =
-      correctElements.length > 0 ? 100 / correctElements.length : 0;
-    const pointsPerIncorrect = pointsPerCorrect / 2; // Penalty for incorrect selections
+    // Each true positive is worth 10 points
+    const truePositivePoints = truePositives.length * 10;
+    // Each false positive results in a 5 point deduction
+    const falsePositiveDeduction = falsePositives.length * 5;
 
-    let score = truePositives.length * pointsPerCorrect;
-    score = Math.max(0, score - falsePositives.length * pointsPerIncorrect);
-    score = Math.min(100, Math.round(score)); // Normalize to 0-100%
+    // Calculate earned points (ensuring it's never negative)
+    const earnedPoints = Math.max(
+      0,
+      truePositivePoints - falsePositiveDeduction
+    );
+    // Total possible points is 10 points per correct element
+    const maxPoints = correctElements.length * 10;
+
+    // Calculate percentage score
+    const score =
+      maxPoints > 0
+        ? Math.min(100, Math.round((earnedPoints / maxPoints) * 100))
+        : 0;
 
     setShowExplanation(true);
     setShowTooltip(false);
-
-    // Calculate earned points (based on 10 points per correct element)
-    const earnedPoints = truePositives.length * 10 - falsePositives.length * 5; // -5 points for each false positive
-    const maxPoints = correctElements.length * 10;
 
     onAnswer({
       score,
@@ -110,7 +115,6 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
       },
     });
   };
-
   // Render email sections (sender, subject, etc.) with clickable areas
   const renderEmailField = (fieldName, fieldValue) => {
     // Find if any suspicious elements are in this field
