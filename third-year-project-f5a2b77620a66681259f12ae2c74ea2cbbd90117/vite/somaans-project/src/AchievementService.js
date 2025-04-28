@@ -19,7 +19,7 @@ class AchievementService {
       const data = await response.json();
       const currentAchievements = data.achievements || [];
       
-      // If we don't have a cache yet, initialize it and return with no new achievements
+      // If we don't have a cache yet, initialise it and return with no new achievements
       if (!this.achievementCache) {
         this.achievementCache = currentAchievements.map(a => ({
           id: a.id,

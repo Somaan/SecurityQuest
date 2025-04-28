@@ -150,13 +150,10 @@ const Dashboard = () => {
     try {
       console.log("Checking for new achievements...");
 
-      // Check for streak-based achievements, but don't queue them for the bottom notification
+      // Check for streak-based achievements
       const streakAchievements =
         await AchievementService.checkStreakAchievements(userId);
       console.log("Found streak achievements:", streakAchievements);
-
-      // We're only handling the top notification, so no need to queue for bottom notification
-      // The top notification is managed separately through setLatestAchievement
 
       // Check for new achievements from API
       const newAchievements = await AchievementService.checkForNewAchievements(
@@ -164,14 +161,11 @@ const Dashboard = () => {
       );
       console.log("New achievements from API:", newAchievements);
 
-      // Show in top notification system if available
-      if (newAchievements.length > 0 && !showAchievementPopup) {
-        const latestOne = newAchievements[0];
-        setLatestAchievement(latestOne);
-        setShowAchievementPopup(true);
-      }
+      // Don't set notifications here - let the main useEffect handle it
+      return newAchievements;
     } catch (err) {
       console.error("Error checking achievements:", err);
+      return [];
     }
   };
 
@@ -205,15 +199,26 @@ const Dashboard = () => {
         setQuizHistory(streaksData.quizHistory || []);
         setAchievements(achievementsData.achievements || []);
 
-        // Check for new achievements after loading the data
-        await checkForNewAchievements();
+        // Check for streak achievements, but don't display them yet
+        await AchievementService.checkStreakAchievements(userId);
 
-        const unlockedAchievements =
-          achievementsData && achievementsData.achievements
-            ? achievementsData.achievements.filter((a) => a.unlocked)
-            : [];
+        // Check for new achievements, but don't display them yet
+        await AchievementService.checkForNewAchievements(userId);
+
+        // After all checks, fetch the latest achievements again to ensure we have everything
+        const finalAchievementsResponse = await fetch(
+          API_ENDPOINTS.GET_USER_ACHIEVEMENTS.replace(":userId", userId)
+        );
+        const finalAchievementsData = await finalAchievementsResponse.json();
+        const allAchievements = finalAchievementsData.achievements || [];
+
+        // Find the most recent unlocked achievement
+        const unlockedAchievements = allAchievements.filter(
+          (a) => a && a.unlocked
+        );
 
         if (unlockedAchievements.length > 0) {
+          // Sort by unlock date (newest first)
           const sortedAchievements = unlockedAchievements.sort((a, b) => {
             if (a.unlockDate && b.unlockDate) {
               return new Date(b.unlockDate) - new Date(a.unlockDate);
@@ -221,22 +226,24 @@ const Dashboard = () => {
             return 0;
           });
 
-          const latestAchievement = sortedAchievements[0];
+          // Get the most recent achievement
+          const mostRecentAchievement = sortedAchievements[0];
 
-          // Only show if not already seen
+          // Only show if not already seen in this session
           if (
-            latestAchievement &&
-            !seenAchievements.current.has(latestAchievement.id)
+            mostRecentAchievement &&
+            !seenAchievements.current.has(mostRecentAchievement.id)
           ) {
-            seenAchievements.current.add(latestAchievement.id);
-            setLatestAchievement(latestAchievement);
+            seenAchievements.current.add(mostRecentAchievement.id);
+            setLatestAchievement(mostRecentAchievement);
             setShowAchievementPopup(true);
+
+            // Auto close the popup after 5 seconds
+            setTimeout(() => {
+              setShowAchievementPopup(false);
+            }, 5000);
           }
         }
-        // Auto close the popup after 5 seconds
-        setTimeout(() => {
-          setShowAchievementPopup(false);
-        }, 5000);
       } catch (err) {
         console.error("Error fetching user data:", err);
         setError(err.message);

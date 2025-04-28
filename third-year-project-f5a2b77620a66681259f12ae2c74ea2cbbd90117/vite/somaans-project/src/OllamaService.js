@@ -1,6 +1,6 @@
 /**
  * OllamaService.js - Enhanced service for interacting with locally-running Ollama models
- * Provides more personalized and context-aware prompts for security feedback
+ * Provides more personalised and context-aware prompts for security feedback
  */
 
 // Configuration for Ollama
@@ -9,7 +9,7 @@ const OLLAMA_CONFIG = {
   DEFAULT_MODEL: 'llama3', // Use whichever model you have installed locally
   TIMEOUT: 30000, // 30 seconds timeout for responses
   MAX_RETRIES: 2,  // Number of retries if a request fails
-  // Security topics taxonomy for better categorization
+  // Security topics taxonomy for better categorisation
   SECURITY_TOPICS: {
     EMAIL_PHISHING: {
       keywords: ['email', 'phishing', 'attachment', 'sender', 'link'],
@@ -240,18 +240,18 @@ class OllamaService {
   }
 
   /**
-   * Enhanced categorization of questions based on content analysis
+   * Enhanced categorisation of questions based on content analysis
    * @param {Array} questions - Array of question objects
-   * @returns {Object} - Categorized questions by topic
+   * @returns {Object} - Categorised questions by topic
    */
-  static categorizeQuestions(questions) {
-    const categorizedQuestions = {};
+  static categoriseQuestions(questions) {
+    const categorisedQuestions = {};
     
     questions.forEach(question => {
-      // Get the question text to analyze
+      // Get the question text to analyse
       const questionText = question.question.toLowerCase();
       
-      // First try to categorize by explicit type
+      // First try to categorise by explicit type
       if (question.type) {
         let category;
         switch (question.type) {
@@ -272,13 +272,13 @@ class OllamaService {
         }
         
         if (category) {
-          categorizedQuestions[category] = categorizedQuestions[category] || [];
-          categorizedQuestions[category].push(question);
+          categorisedQuestions[category] = categorisedQuestions[category] || [];
+          categorisedQuestions[category].push(question);
           return;
         }
       }
       
-      // If no type or not categorized yet, use content analysis
+      // If no type or not categorised yet, use content analysis
       let bestMatchScore = 0;
       let bestMatchCategory = 'GENERAL_SECURITY';
       
@@ -307,11 +307,11 @@ class OllamaService {
       });
       
       // Add question to best matching category
-      categorizedQuestions[bestMatchCategory] = categorizedQuestions[bestMatchCategory] || [];
-      categorizedQuestions[bestMatchCategory].push(question);
+      categorisedQuestions[bestMatchCategory] = categorisedQuestions[bestMatchCategory] || [];
+      categorisedQuestions[bestMatchCategory].push(question);
     });
     
-    return categorizedQuestions;
+    return categorisedQuestions;
   }
   
   /**
@@ -344,11 +344,11 @@ class OllamaService {
       return this.generatePerfectScoreFeedback(difficulty, userContext);
     }
     
-    // Enhanced categorization
-    const categorizedQuestions = this.categorizeQuestions(incorrectAnswers);
+    // Enhanced categorisation
+    const categorisedQuestions = this.categoriseQuestions(incorrectAnswers);
     
     // Prepare topic-specific prompts for each category
-    const topicPromises = Object.entries(categorizedQuestions).map(async ([category, questions]) => {
+    const topicPromises = Object.entries(categorisedQuestions).map(async ([category, questions]) => {
       return this.generateTopicFeedback(category, questions, difficulty, userContext);
     });
     
@@ -412,7 +412,7 @@ Type: ${this.formatQuestionType(questionData.type)}
 User's score: ${questionData.score || 0}%`;
       }
       
-      // Add user context to create a more personalized experience
+      // Add user context to create a more personalised experience
       const contextInfo = [];
       if (userContext.name) contextInfo.push(`User's name: ${userContext.name}`);
       if (userContext.role) contextInfo.push(`User's role: ${userContext.role}`);
@@ -425,15 +425,15 @@ User's score: ${questionData.score || 0}%`;
         : '';
       
       // Craft a system prompt specifically for this question
-      const systemPrompt = `You are an expert cybersecurity educator specializing in ${this.formatQuestionType(questionData.type || 'security awareness')}. 
-Your task is to provide highly personalized, targeted feedback for Question #${questionNumber}: "${questionData.question}".
+      const systemPrompt = `You are an expert cybersecurity educator specialising in ${this.formatQuestionType(questionData.type || 'security awareness')}. 
+Your task is to provide highly personalised, targeted feedback for Question #${questionNumber}: "${questionData.question}".
 Focus exclusively on this particular question and the specific misconception evident in their incorrect answer.
 Your feedback should be tailored to a ${difficulty} difficulty level and provide immediately actionable advice relevant to real-world scenarios.
 Make your feedback UNIQUE and SPECIFIC to THIS EXACT question - do not provide generic cybersecurity advice.`;
       
       // Create a detailed question-specific prompt
       const prompt = `
-I need your help creating personalized feedback for this specific security question that a user answered incorrectly.
+I need your help creating personalised feedback for this specific security question that a user answered incorrectly.
 
 QUESTION DETAILS:
 ${questionDetails}
@@ -444,7 +444,7 @@ Difficulty level: ${difficulty}
 Based on this specific incorrect answer to Question #${questionNumber}, please provide:
 
 1. A clear, concise title that accurately reflects the specific security concept in THIS question the user misunderstood (max 10 words)
-2. Why understanding this SPECIFIC concept from Question #${questionNumber} is important (2 sentences maximum, emphasizing real-world impact)
+2. Why understanding this SPECIFIC concept from Question #${questionNumber} is important (2 sentences maximum, emphasising real-world impact)
 3. 3-4 key learning points that DIRECTLY address the specific misconception shown in this particular answer
 4. 2-3 practical tips they can apply immediately that are DIRECTLY related to this specific security concept
 5. 1-2 reliable learning resources specific to this concept (just names of websites, tools, or content)
@@ -559,7 +559,7 @@ User's score: ${q.score || 0}%`;
       }
     }).join("\n\n");
     
-    // Add user context to create a more personalized experience
+    // Add user context to create a more personalised experience
     const contextInfo = [];
     if (userContext.role) contextInfo.push(`User's role: ${userContext.role}`);
     if (userContext.industry) contextInfo.push(`User's industry: ${userContext.industry}`);
@@ -571,14 +571,14 @@ User's score: ${q.score || 0}%`;
       : '';
     
     // Enhanced system prompt for better framing
-    const systemPrompt = `You are an expert cybersecurity educator specializing in ${this.formatCategoryName(category)}. 
-Your task is to provide personalized, actionable feedback that helps the user improve their security knowledge and practical skills.
+    const systemPrompt = `You are an expert cybersecurity educator specialising in ${this.formatCategoryName(category)}. 
+Your task is to provide personalised, actionable feedback that helps the user improve their security knowledge and practical skills.
 Your feedback should be tailored to a ${difficulty} difficulty level, and should address specific misconceptions evident in their incorrect answers.
 Always provide practical, immediately applicable advice that's relevant to real-world scenarios.`;
     
     // Create a detailed topic-specific prompt
     const prompt = `
-I need your help creating personalized feedback for a user who took a cybersecurity quiz.
+I need your help creating personalised feedback for a user who took a cybersecurity quiz.
 
 Topic: ${this.formatCategoryName(category)}
 Difficulty level: ${difficulty}${userContextStr}
@@ -588,7 +588,7 @@ ${questionsText}
 
 Based on these specific errors, please provide:
 
-1. Why this topic is important (2 sentences maximum, emphasizing real-world impact)
+1. Why this topic is important (2 sentences maximum, emphasising real-world impact)
 2. 3-4 key learning points that directly address the misconceptions shown in their wrong answers
 3. 2-3 practical tips they can apply immediately in their daily digital life or workplace
 4. 1-2 reliable learning resources specific to this topic (just names of websites, tools, or content)
@@ -761,16 +761,16 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
     // Base importance statement
     const baseImportance = "Email phishing remains the most common initial vector for security breaches, accounting for over 90% of successful cyber attacks.";
     
-    // Customize based on subtype
+    // Customise based on subtype
     switch (subtype) {
       case 'spear':
         return {
           title,
-          importance: "Spear phishing attacks are targeted, highly personalized, and research-driven, making them significantly more effective than mass phishing attempts.",
+          importance: "Spear phishing attacks are targeted, highly personalised, and research-driven, making them significantly more effective than mass phishing attempts.",
           keyPoints: [
-            "Spear phishing emails contain personalized information gathered from your digital footprint",
-            "These attacks often appear to come from trusted colleagues, superiors, or organizations you regularly interact with",
-            "They typically reference specific projects, recent communications, or organizational events to establish credibility",
+            "Spear phishing emails contain personalised information gathered from your digital footprint",
+            "These attacks often appear to come from trusted colleagues, superiors, or organisations you regularly interact with",
+            "They typically reference specific projects, recent communications, or organisational events to establish credibility",
             "Even sophisticated users can fall victim due to the highly convincing nature of these targeted messages"
           ],
           practicalTips: [
@@ -787,7 +787,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       case 'attachment':
         return {
           title,
-          importance: "Malicious email attachments remain one of the primary delivery mechanisms for malware, including ransomware that can cripple entire organizations.",
+          importance: "Malicious email attachments remain one of the primary delivery mechanisms for malware, including ransomware that can cripple entire organisations.",
           keyPoints: [
             "Even attachments that appear to be harmless document types can contain dangerous macros or exploits",
             "File extensions can be disguised to make executable files appear as documents",
@@ -839,7 +839,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
           practicalTips: [
             "Take a moment to pause and evaluate any email creating a sense of urgency",
             "Verify urgent requests through official channels, not by replying to the email",
-            "Remember that legitimate organizations rarely demand immediate action via email"
+            "Remember that legitimate organisations rarely demand immediate action via email"
           ],
           resources: [
             "SANS Security Awareness: Social Engineering tactics training",
@@ -860,7 +860,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
           practicalTips: [
             "Hover over links to reveal the actual URL destination before clicking",
             "Contact the purported sender through a different channel if an email seems suspicious",
-            "Use email authentication protocols like DMARC, SPF, and DKIM in your organization"
+            "Use email authentication protocols like DMARC, SPF, and DKIM in your organisation"
           ],
           resources: [
             "Anti-Phishing Working Group (APWG) resources",
@@ -903,15 +903,15 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       title,
       importance: "Voice phishing bypasses technical security controls by exploiting human trust through real-time conversation and caller ID spoofing.",
       keyPoints: [
-        "Caller ID can be easily spoofed to display legitimate organization names or numbers",
+        "Caller ID can be easily spoofed to display legitimate organisation names or numbers",
         "Real-time conversation creates pressure to respond immediately without verification",
         "Human voices build trust and make it harder to detect deception compared to email",
         "Attackers often have prepared scripts and answers to anticipated questions"
       ],
       practicalTips: [
         "Never provide sensitive information to inbound callers, no matter how convincing they sound",
-        "Hang up and call back using the official number from the organization's website",
-        "Implement a verification protocol for unexpected calls in your organization"
+        "Hang up and call back using the official number from the organisation's website",
+        "Implement a verification protocol for unexpected calls in your organisation"
       ],
       resources: [
         "FTC Phone Scam resources",
@@ -951,7 +951,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
   static getPasswordSecurityFeedback(questionNumber, title) {
     return {
       title,
-      importance: "Password compromise remains the primary method of account takeover, with poor password hygiene putting both personal and organizational security at risk.",
+      importance: "Password compromise remains the primary method of account takeover, with poor password hygiene putting both personal and organisational security at risk.",
       keyPoints: [
         "Password reuse across sites means a breach at one service compromises all your accounts",
         "Length is more important than complexity - consider using longer passphrases",
@@ -985,7 +985,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       ],
       practicalTips: [
         "Verify requests through a different, trusted communication channel",
-        "Establish authentication procedures for sensitive requests within your organization",
+        "Establish authentication procedures for sensitive requests within your organisation",
         "Be skeptical of unexpected contact, especially those creating urgency or fear"
       ],
       resources: [
@@ -1025,13 +1025,13 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       ]
     };
     
-    // Try to customize based on keywords from the question
+    // Try to customise based on keywords from the question
     if (keywords.length > 0) {
       // Pick two random keywords
       const keyword1 = keywords[Math.floor(Math.random() * keywords.length)];
       const keyword2 = keywords[Math.floor(Math.random() * keywords.length)];
       
-      // Customize one key point and one practical tip
+      // Customise one key point and one practical tip
       baseFeedback.keyPoints[0] = `Pay special attention to ${keyword1.toLowerCase()} when evaluating security situations`;
       baseFeedback.practicalTips[0] = `Regularly review your approach to ${keyword2.toLowerCase()} security to ensure best practices`;
     }
@@ -1051,7 +1051,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
     // Map of fallback content by category
     const fallbackContent = {
       'EMAIL_PHISHING': {
-        importance: "Email phishing remains one of the most common initial attack vectors for security breaches in organizations.",
+        importance: "Email phishing remains one of the most common initial attack vectors for security breaches in organisations.",
         keyPoints: [
           "Always verify the sender's email address by checking the actual email address, not just the display name",
           "Be suspicious of urgency, threatening language, or offers that seem too good to be true",
@@ -1061,7 +1061,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
         practicalTips: [
           "Contact the purported sender through a different channel if an email seems suspicious",
           "Never enter credentials on a page you reached via an email link",
-          "Set up advanced email filtering and enable email authentication protocols in your organization"
+          "Set up advanced email filtering and enable email authentication protocols in your organisation"
         ],
         resources: [
           "Anti-Phishing Working Group (APWG) resources",
@@ -1071,15 +1071,15 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       'VISHING': {
         importance: "Voice phishing bypasses technical security controls by exploiting human trust through phone calls and is increasingly targeting remote workers.",
         keyPoints: [
-          "Legitimate organizations rarely call you unexpectedly about technical or account issues",
+          "Legitimate organisations rarely call you unexpectedly about technical or account issues",
           "Pressure tactics and creating artificial urgency are red flags in phone conversations",
           "Caller ID can be easily spoofed and should never be solely trusted for verification",
           "Requests for remote access to your computer are almost always malicious"
         ],
         practicalTips: [
-          "Hang up and call back using the official number from the organization's website or your account statement",
+          "Hang up and call back using the official number from the organisation's website or your account statement",
           "Never provide sensitive information to inbound callers, no matter how convincing they sound",
-          "Implement a verification protocol for phone-based requests in your organization"
+          "Implement a verification protocol for phone-based requests in your organisation"
         ],
         resources: [
           "Federal Trade Commission (FTC) Scam Alert resources",
@@ -1089,13 +1089,13 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       'SMISHING': {
         importance: "SMS phishing exploits the trusted nature of text messages and the limited security features on mobile devices.",
         keyPoints: [
-          "Legitimate organizations typically don't request sensitive information via text messages",
+          "Legitimate organisations typically don't request sensitive information via text messages",
           "Shortened URLs in text messages are often used to hide malicious destinations",
           "Messages creating a sense of urgency or fear are common smishing tactics",
           "Mobile interfaces make it harder to verify sender authenticity"
         ],
         practicalTips: [
-          "Never click links in suspicious text messages, instead go directly to the organization's website",
+          "Never click links in suspicious text messages, instead go directly to the organisation's website",
           "Verify requests through official channels before responding to SMS messages asking for information",
           "Report suspicious text messages to your mobile carrier's spam reporting service"
         ],
@@ -1123,7 +1123,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
         ]
       },
       'PASSWORD_SECURITY': {
-        importance: "Strong password management remains a fundamental defense against unauthorized access, especially as credential theft increases.",
+        importance: "Strong password management remains a fundamental defense against unauthorised access, especially as credential theft increases.",
         keyPoints: [
           "Use unique passwords for each account to prevent credential stuffing attacks",
           "Length is more important than complexity - aim for passphrases of 16+ characters",
@@ -1141,7 +1141,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
         ]
       },
       'SOCIAL_ENGINEERING': {
-        importance: "Social engineering attacks target human psychology rather than technical vulnerabilities, making them effective against even security-conscious organizations.",
+        importance: "Social engineering attacks target human psychology rather than technical vulnerabilities, making them effective against even security-conscious organisations.",
         keyPoints: [
           "Verify requests through separate communication channels, especially for sensitive actions",
           "Be skeptical of artificial urgency or pressure tactics in any communication",
@@ -1149,7 +1149,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
           "Remember that authority can be faked - verify identity through established procedures"
         ],
         practicalTips: [
-          "Establish clear verification procedures for sensitive requests in your organization",
+          "Establish clear verification procedures for sensitive requests in your organiaation",
           "Pause and think critically before acting on unexpected requests",
           "Never provide sensitive information to someone who contacted you first"
         ],
@@ -1159,7 +1159,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
         ]
       },
       'GENERAL_SECURITY': {
-        importance: "A strong foundation in security principles helps you recognize and respond appropriately to a wide range of threats.",
+        importance: "A strong foundation in security principles helps you recognise and respond appropriately to a wide range of threats.",
         keyPoints: [
           "Verify requests through separate, trusted channels before taking action",
           "Be skeptical of urgency, pressure tactics, and unexpected communications",
@@ -1200,7 +1200,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
   }
   
   /**
-   * Generate feedback for perfect scores with enhanced personalization
+   * Generate feedback for perfect scores with enhanced personalisation
    * @param {string} difficulty - Quiz difficulty level
    * @param {Object} userContext - User context information
    * @returns {Object} - Perfect score feedback
@@ -1212,7 +1212,7 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
         // Enhanced system prompt for perfect score
         const systemPrompt = `You are an advanced cybersecurity education specialist providing feedback to a user who has demonstrated excellent understanding of security concepts. Your goal is to recognize their achievement while encouraging continued learning and advancement.`;
         
-        // Add user context to create a more personalized experience
+        // Add user context to create a more personalised experience
         const contextInfo = [];
         if (userContext.name) contextInfo.push(`User's name: ${userContext.name}`);
         if (userContext.role) contextInfo.push(`User's role: ${userContext.role}`);
@@ -1221,11 +1221,11 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
         if (userContext.careerGoals) contextInfo.push(`User's career goals: ${userContext.careerGoals}`);
         
         const userContextStr = contextInfo.length > 0 
-          ? `\nPersonalization context:\n${contextInfo.join("\n")}`
+          ? `\nPersonalisation context:\n${contextInfo.join("\n")}`
           : '';
         
         const prompt = `
-I need your help creating personalized feedback for a user who achieved a perfect score on a ${difficulty} level security quiz.${userContextStr}
+I need your help creating personaliaed feedback for a user who achieved a perfect score on a ${difficulty} level security quiz.${userContextStr}
 
 Please provide:
 1. A specific, genuinely encouraging congratulatory message that acknowledges their mastery (2-3 sentences)
@@ -1281,7 +1281,7 @@ Make your response genuinely encouraging while offering truly valuable next step
         keyPoints: [
           "Explore advanced threat hunting and incident response techniques",
           "Learn about security architecture and defense-in-depth strategies",
-          "Consider specializing in a security domain like application security or network defense"
+          "Consider specialising in a security domain like application security or network defense"
         ],
         practicalTips: [
           "Practice with hands-on labs or capture-the-flag competitions",
@@ -1298,7 +1298,7 @@ Make your response genuinely encouraging while offering truly valuable next step
         keyPoints: [
           "Explore emerging threat vectors like supply chain attacks and AI-driven threats",
           "Consider contributing to open-source security projects or research",
-          "Develop specialized knowledge in areas like threat intelligence or zero trust architecture"
+          "Develop specialised knowledge in areas like threat intelligence or zero trust architecture"
         ],
         practicalTips: [
           "Create custom security tools or automation for specific needs",
@@ -1340,7 +1340,7 @@ Make your response genuinely encouraging while offering truly valuable next step
     });
     
     return {
-      analysis: `Based on your quiz performance on this ${difficulty} level quiz, we've created personalized feedback for each question you missed.`,
+      analysis: `Based on your quiz performance on this ${difficulty} level quiz, we've created personalised feedback for each question you missed.`,
       topics: topics
     };
   }
