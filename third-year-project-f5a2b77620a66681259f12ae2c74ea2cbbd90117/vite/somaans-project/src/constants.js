@@ -212,26 +212,51 @@ The Amazon Security Team
             id: "element1",
             description: "The sender's email address is not from an official amazon.com domain",
             coordinates: {top: 10, left: 5, width: 90, height: 5},
-            hint: "Official Amazon emails come from domains ending with @amazon.com"
+            hint: "Official Amazon emails come from domains ending with @amazon.com",
+            content: "amazon-support@amazonsecure.service-id.net",
+            isCorrect: true
           },
           {
             id: "element2",
             description: "Urgent language creating artificial time pressure ('within 24 hours')",
             coordinates: {top: 40, left: 15, width: 70, height: 5},
-            hint: "Phishing emails often create false urgency to prevent you from thinking critically"
+            hint: "Phishing emails often create false urgency to prevent you from thinking critically",
+            content: "Please verify your information within 24 hours",
+            isCorrect: true
           },
           {
             id: "element3",
             description: "The link URL is not an official Amazon domain",
             coordinates: {top: 50, left: 35, width: 30, height: 5},
-            hint: "Always check where links actually point before clicking"
+            hint: "Always check where links actually point before clicking",
+            content: "Account Verification Portal",
+            isCorrect: true
           },
           {
             id: "element4",
             description: "Threat of account suspension as a scare tactic",
             coordinates: {top: 60, left: 5, width: 95, height: 5},
-            hint: "Phishers often use threats to manipulate victims into acting"
-          }
+            hint: "Phishers often use threats to manipulate victims into acting",
+            content: "If you fail to verify your account information, your account will be suspended permanently.",
+            isCorrect: true
+          },
+          {
+            id: "element5",
+            description: "The official Amazon copyright notice",
+            coordinates: {top: 80, left: 5, width: 90, height: 5},
+            hint: "Copyright notices are standard elements in legitimate emails too",
+            content: "© 2025 Amazon.com, Inc. All rights reserved.",
+            isCorrect: false
+          },
+            {
+              id: "element6",
+              description: "The date and time of the email",
+              coordinates: {top: 15, left: 60, width: 30, height: 5},
+              hint: "The date and time format is standard",
+              content: "April 8, 2025, 14:34",
+              isCorrect: false
+            }
+          
         ],
         explanation: "This email exhibits multiple classic phishing red flags: it's from a non-Amazon domain, creates false urgency, contains a suspicious link, and uses threat tactics to manipulate the recipient. Always verify suspicious emails by contacting the company directly through their official website or phone number, never through links in the email itself."
       },
