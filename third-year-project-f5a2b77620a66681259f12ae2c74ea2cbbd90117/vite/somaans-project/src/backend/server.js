@@ -6,6 +6,19 @@ const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const app = express();
 
+// Middleware
+app.use(cors({
+    origin: [
+      'http://localhost:5173',  // Local Vite dev server
+      'https://z1nvc8z-5173.uk1.devtunnels.ms'  // Your dev tunnel address
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true  
+  }));
+
+  app.use(express.json());
+
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
 // API endpoint to get user achievements
@@ -394,17 +407,6 @@ console.log('Testing environment setup...');
 console.log('SendGrid API Key loaded:', process.env.SENDGRID_API_KEY ? 'Yes' : 'No');
 console.log('API Key length:', process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.length : 0);
 
-// Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:5173',  // Local Vite dev server
-    'https://z1nvc8z-5173.uk1.devtunnels.ms'  // Your dev tunnel address
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true  
-}));
-app.use(express.json());
 
 // Login endpoint with Remember Me support
 app.post('/api/login', async (req, res) => {

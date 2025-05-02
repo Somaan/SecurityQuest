@@ -6,7 +6,7 @@
 // Configuration for Ollama
 const OLLAMA_CONFIG = {
   API_URL: 'http://localhost:11434/api/generate',
-  DEFAULT_MODEL: 'llama3', // Use whichever model you have installed locally
+  DEFAULT_MODEL: 'phi3', // Use whichever model you have installed locally
   TIMEOUT: 30000, // 30 seconds timeout for responses
   MAX_RETRIES: 2,  // Number of retries if a request fails
   // Security topics taxonomy for better categorisation

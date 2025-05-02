@@ -545,10 +545,8 @@ const Statistics = () => {
     <div className="content-wrapper">
       <div className="statistics-container">
         <div className="statistics-header">
-          <h2>Statistics Dashboard</h2>
-          <p className="statistics-subtitle">
-            Track your progress and improvement over time
-          </p>
+          <h2>Statistics</h2>
+          <h3>Track your quiz progress over time!</h3>
         </div>
 
         {/* Tab selection for statistics views */}
@@ -1165,8 +1163,14 @@ const Statistics = () => {
 
         .statistics-header h2 {
           color: #ffffff;
-          font-size: 1.8rem;
-          margin-bottom: 0.5rem;
+          font-size: 1.5rem;
+          margin-bottom: 1rem;
+        }
+        .statistics-header h3 {
+          color: #e0e0e0;
+          font-size: 1rem;
+          font-weight: normal;
+          margin-top: 0.5rem;
         }
 
         .statistics-subtitle {

@@ -79,10 +79,11 @@ class AchievementService {
       console.log("Checking streak achievements for user:", userId);
       console.log("Current login streak:", userData.login_streak);
       
-      // Calculate progress percentages
-      const dedicatedUserProgress = Math.min(100, (userData.login_streak / 3) * 100);
-      const weeklyWarriorProgress = Math.min(100, (userData.login_streak / 7) * 100);
-      const monthlyMasterProgress = Math.min(100, (userData.login_streak / 30) * 100);
+      // Calculate progress percentages 
+      const loginStreak = userData.login_streak || 0;
+      const dedicatedUserProgress = Math.min(100, (loginStreak / 3) * 100);
+      const weeklyWarriorProgress = Math.min(100, (loginStreak / 7) * 100);
+      const monthlyMasterProgress = Math.min(100, (loginStreak / 30) * 100);
       
       console.log("Weekly warrior progress:", weeklyWarriorProgress.toFixed(1) + "%");
       console.log("Monthly Master progress:", monthlyMasterProgress.toFixed(1) + "%");
@@ -90,7 +91,7 @@ class AchievementService {
       const updatedAchievements = [];
       
       // Dedicated User (3-day login streak)
-      const dedicatedUserUnlocked = userData.login_streak >= 3;
+      const dedicatedUserUnlocked = loginStreak >= 3;
       updatedAchievements.push({
         id: 1, // ID from database
         title: 'Dedicated User',
@@ -102,7 +103,7 @@ class AchievementService {
       });
       
       // Weekly Warrior (7-day login streak)
-      const weeklyWarriorUnlocked = userData.login_streak >= 7;
+      const weeklyWarriorUnlocked = loginStreak >= 7;
       updatedAchievements.push({
         id: 2, // ID from database
         title: 'Weekly Warrior',
@@ -114,7 +115,7 @@ class AchievementService {
       });
       
       // Monthly Master (30-day login streak)
-      const monthlyMasterUnlocked = userData.login_streak >= 30;
+      const monthlyMasterUnlocked = loginStreak >= 30;
       updatedAchievements.push({
         id: 3, // ID from database
         title: 'Monthly Master',

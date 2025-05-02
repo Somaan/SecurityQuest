@@ -54,7 +54,7 @@ const STATUS_FILTERS = [
   { id: "progress", label: "In Progress" },
 ];
 
-// Single achievement card component with improved locked/unlocked visualization
+// Single achievement card component with improved locked/unlocked visualisation
 const AchievementCard = ({ achievement }) => {
   // Safely extract values with proper type checking
   const {
@@ -327,7 +327,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background-color: #1e1e2f;
+          background-color: #1a1a1a;
           border-radius: 12px;
           padding: 1.5rem;
           margin-bottom: 2rem;
@@ -342,7 +342,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .stat-counter {
           text-align: center;
-          background-color: #2a2a3d;
+          background-color: #242424;
           padding: 0.75rem 1.25rem;
           border-radius: 8px;
           min-width: 80px;
@@ -356,7 +356,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .counter-label {
           font-size: 0.8rem;
-          color: #9f9fb8;
+          color: #b3b3b3;
         }
 
         .unlocked-counter .counter-value {
@@ -387,13 +387,13 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .progress-label {
           font-size: 0.85rem;
-          color: #9f9fb8;
+          color: #b3b3b3;
           margin-top: 0.5rem;
         }
 
         .circle-bg {
           fill: none;
-          stroke: #2e2e3f;
+          stroke: #2c3e50;
           stroke-width: 3;
         }
 
@@ -421,13 +421,13 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .progress-stats p {
           margin: 0;
-          color: #9f9fb8;
+          color: #b3b3b3;
           font-size: 1rem;
         }
 
         .achievement-filters-container {
           margin-bottom: 2rem;
-          background-color: #1e1e2f;
+          background-color: #1a1a1a;
           border-radius: 12px;
           padding: 1rem;
         }
@@ -449,8 +449,8 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
           width: 100%;
           padding: 10px 10px 10px 35px;
           border-radius: 8px;
-          border: 1px solid #2a2a3d;
-          background-color: #2a2a3d;
+          border: 1px solid #242424;
+          background-color: #242424;
           color: #fff;
           font-size: 0.9rem;
         }
@@ -474,7 +474,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .filter-label {
           margin-bottom: 0.5rem;
-          color: #9f9fb8;
+          color: #b3b3b3;
           font-size: 0.9rem;
           display: flex;
           align-items: center;
@@ -488,8 +488,8 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
         }
 
         .filter-buttons button {
-          background-color: #2a2a3d;
-          color: #9f9fb8;
+          background-color: #242424;
+          color: #b3b3b3;
           border: none;
           border-radius: 20px;
           padding: 0.35rem 0.9rem;
@@ -504,7 +504,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
         }
 
         .filter-buttons button:hover:not(.active) {
-          background-color: #3a3a4d;
+          background-color: #333333;
           color: #fff;
         }
 
@@ -515,7 +515,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
         }
 
         .achievement-card {
-          background-color: #1e1e2f;
+          background-color: #1a1a1a;
           border-radius: 12px;
           overflow: hidden;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -562,7 +562,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .achievement-card.legendary {
           border-left: 4px solid #e74c3c;
-          background: linear-gradient(135deg, #1e1e2f 0%, #2c1c1f 100%);
+          background: linear-gradient(135deg, #1a1a1a 0%, #2c1c1f 100%);
         }
 
         .achievement-icon {
@@ -616,7 +616,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .achievement-info p {
           margin: 0;
-          color: #9f9fb8;
+          color: #b3b3b3;
           font-size: 0.85rem;
           margin-bottom: 0.75rem;
         }
@@ -627,7 +627,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .progress-bar-bg {
           height: 6px;
-          background-color: #2e2e3f;
+          background-color: #2c3e50;
           border-radius: 3px;
           overflow: hidden;
         }
@@ -640,7 +640,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .progress-text {
           font-size: 0.75rem;
-          color: #9f9fb8;
+          color: #b3b3b3;
           margin-top: 4px;
           display: block;
           text-align: right;
@@ -659,7 +659,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .unlock-date {
           margin-left: 0.5rem;
-          color: #9f9fb8;
+          color: #b3b3b3;
           font-size: 0.8rem;
         }
 
@@ -676,7 +676,7 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
 
         .rarity-badge.common {
           background-color: #9f9fb8;
-          color: #1e1e2f;
+          color: #1a1a1a;
         }
 
         .rarity-badge.uncommon {
@@ -703,9 +703,9 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
           grid-column: 1 / -1;
           text-align: center;
           padding: 3rem 1rem;
-          background-color: #1e1e2f;
+          background-color: #1a1a1a;
           border-radius: 12px;
-          color: #9f9fb8;
+          color: #b3b3b3;
         }
 
         .no-achievements-icon {

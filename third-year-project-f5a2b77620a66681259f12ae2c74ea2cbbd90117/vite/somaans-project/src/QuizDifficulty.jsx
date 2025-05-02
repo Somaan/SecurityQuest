@@ -68,8 +68,7 @@ const QuizDifficulty = () => {
               </div>
               <p className="quiz-description">
                 This quiz will cover phishing concepts and fundamentals to
-                protect yourself against the biggest threat to our online
-                safety!
+                protect yourself against the biggest threat in the cyberspace!
               </p>
             </div>
             <div className="quiz-arrow">
@@ -125,7 +124,7 @@ const QuizDifficulty = () => {
               <p className="quiz-description">
                 In our Advanced quiz, it will combine what Beginner/Intermediate
                 levels included, but with added Corporate examples and even more
-                complex threats.
+                complex threats to identify from.
               </p>
             </div>
             <div className="quiz-arrow">

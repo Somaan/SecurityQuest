@@ -26,6 +26,7 @@ const Register = () => {
     password: "",
     confirmPassword: "",
   });
+  const [registrationData, setRegistrationData] = useState(null);
 
   const [emailError, setEmailError] = useState(false);
   const [emailValid, setEmailValid] = useState(false);
@@ -144,6 +145,9 @@ const Register = () => {
         throw new Error(data.error || "Registration Failed");
       }
 
+      // Store the registration data for use in handleCaptchaSuccess
+      setRegistrationData(data);
+
       // Simulate API call delay
       setTimeout(() => {
         setIsLoading(false);
@@ -154,10 +158,40 @@ const Register = () => {
       toast.error(error.message);
     }
   };
+
+  const clearPreviousUserData = () => {
+    // Clear any localStorage data that might be from previous users
+    Object.keys(localStorage).forEach((key) => {
+      if (
+        key.includes("_streak_") ||
+        key.includes("progress_") ||
+        key.includes("achievements_")
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+  };
+
   const handleCaptchaSuccess = () => {
+    // Clear any previous user data first
+    clearPreviousUserData();
+
+    // Set authentication state and user info
     sessionStorage.setItem("isAuthenticated", "true");
     sessionStorage.setItem("username", formData.username);
-    toast.success("Login successful!", {
+
+    // Make sure to set the userId from the registration response
+    if (registrationData && registrationData.user && registrationData.user.id) {
+      sessionStorage.setItem("userId", registrationData.user.id.toString());
+      console.log(
+        "New user account created with ID:",
+        registrationData.user.id
+      );
+    } else {
+      console.warn("User ID not found in registration data");
+    }
+
+    toast.success("Registration successful!", {
       position: "top-center",
       autoClose: 2000,
       hideProgressBar: false,

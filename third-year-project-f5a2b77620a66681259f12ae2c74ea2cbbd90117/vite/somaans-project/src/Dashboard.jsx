@@ -682,7 +682,7 @@ const Dashboard = () => {
           {/* Statistics Snapshot */}
           <div className="dashboard-card stats-card">
             <div className="card-header">
-              <h2>Statistics Snapshot</h2>
+              <h2>Statistics Preview</h2>
               <Link to="/statistics" className="view-all-link">
                 View All <FontAwesomeIcon icon={faChevronRight} />
               </Link>

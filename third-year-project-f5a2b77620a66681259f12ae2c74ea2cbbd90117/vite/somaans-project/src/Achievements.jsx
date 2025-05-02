@@ -6,7 +6,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { API_ENDPOINTS } from "./constants";
 import { toast } from "react-toastify";
-import EnhancedGamifiedAchievements from "./EnhancedGamifiedAchievements"; // Import the new component
+import EnhancedGamifiedAchievements from "./EnhancedGamifiedAchievements";
 import AchievementService from "./AchievementService";
 
 const Achievements = () => {
@@ -263,8 +263,9 @@ const Achievements = () => {
         <div className="achievements-header">
           <h2>Let's see what achievements you've received, {username}</h2>
           <h3>
-            As you complete quizzes and login each day, you will be able to view
-            your achievements here.
+            As you progress using SecurityQuest, you will recieve achievements
+            based on quiz scores, login streaks, and much more! Take a look at
+            your progress here.
           </h3>
         </div>
 

@@ -51,6 +51,9 @@ function App() {
   const hideNavBar = isQuizPage;
 
   // Check for remembered user on initial load
+  // In App.jsx, update the useEffect section that checks authentication:
+
+  // Check for remembered user on initial load
   useEffect(() => {
     const checkRememberedUser = async () => {
       // Check if user just logged out - if so, don't auto-login
@@ -58,6 +61,21 @@ function App() {
         sessionStorage.getItem("just_logged_out") === "true";
       if (justLoggedOut) {
         sessionStorage.removeItem("just_logged_out");
+        setIsAuthenticating(false);
+        return;
+      }
+
+      // Important: Ensure userId is consistent with authentication state
+      const currentUserId = sessionStorage.getItem("userId");
+      const isAuth = sessionStorage.getItem("isAuthenticated") === "true";
+
+      // If authenticated but no userId, that's a problem - reset authentication
+      if (isAuth && !currentUserId) {
+        console.warn(
+          "Authentication state inconsistent: Authenticated but no userId"
+        );
+        sessionStorage.removeItem("isAuthenticated");
+        setIsAuthenticated(false);
         setIsAuthenticating(false);
         return;
       }
