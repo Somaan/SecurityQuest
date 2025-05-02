@@ -22,7 +22,7 @@ describe('Login Endpoint', () => {
     jest.clearAllMocks();
     
     // Import the pool module and get the mock
-    pool = require('../db');
+    pool = require('../../db');
     
     // Create a mock req/res
     request = {

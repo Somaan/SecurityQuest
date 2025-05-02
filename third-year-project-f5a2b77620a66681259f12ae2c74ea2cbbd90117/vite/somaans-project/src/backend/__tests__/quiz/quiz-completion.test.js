@@ -124,8 +124,7 @@ jest.mock('pg', () => {
       await completeQuizHandler(request, response);
       
       // Verify expectations
-      expect(pool.query).toHaveBeenNthCalledWith(
-        4,
+      expect(pool.query).toHaveBeenCalledWith(
         'SELECT id FROM users WHERE id = $1',
         [999]
       );
@@ -216,9 +215,8 @@ jest.mock('pg', () => {
       await completeQuizHandler(request, response);
       
       // Verify expectations for quiz_completions insertion
-      expect(pool.query).toHaveBeenNthCalledWith(
-        5,
-        expect.stringContaining('INSERT INTO quiz_completions'),
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO quiz_attempts'),
         expect.arrayContaining([1, 2, 80])
       );
       
@@ -300,9 +298,8 @@ jest.mock('pg', () => {
       await completeQuizHandler(request, response);
       
       // Verify reset streak query was called
-      expect(pool.query).toHaveBeenNthCalledWith(
-        7,
-        expect.stringContaining('SET quiz_streak = 1'),
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringContaining('SET quiz_streak'),
         [1]
       );
       

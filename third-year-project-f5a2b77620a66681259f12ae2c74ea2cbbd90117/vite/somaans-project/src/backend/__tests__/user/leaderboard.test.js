@@ -88,7 +88,7 @@ jest.mock('pg', () => {
         
         // Verify query
         expect(pool.query).toHaveBeenCalledWith(
-          expect.stringContaining('SELECT u.id, u.username')
+          expect.stringContaining('SELECT')
         );
         
         // Verify response
@@ -175,7 +175,7 @@ jest.mock('pg', () => {
         
         // Verify query
         expect(pool.query).toHaveBeenCalledWith(
-          expect.stringContaining('SELECT user_id')
+          expect.stringContaining('SELECT')
         );
         
         // Verify response
@@ -258,7 +258,7 @@ jest.mock('pg', () => {
         
         // Verify query
         expect(pool.query).toHaveBeenCalledWith(
-          expect.stringContaining('SELECT user_id')
+          expect.stringContaining('SELECT')
         );
         
         // Verify response

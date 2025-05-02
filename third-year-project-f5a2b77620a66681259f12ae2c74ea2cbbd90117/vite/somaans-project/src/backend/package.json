@@ -40,7 +40,9 @@
       "html"
     ],
     "testMatch": [
-      "**/__tests__/**/*.js"
+      "/node_modules/",
+      "**/__tests__/**/!(setup|test-utils).js",
+      "**/__tests__/**/*.test.js"
     ],
     "setupFilesAfterEnv": [
       "./__tests__/setup/jest-setup.js"

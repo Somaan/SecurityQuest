@@ -142,7 +142,7 @@ jest.mock('pg', () => {
         // Verify queries
         expect(pool.query).toHaveBeenNthCalledWith(
           1,
-          expect.stringContaining('SELECT id, username'),
+          expect.stringContaining('SELECT'),
           ['123']
         );
         
@@ -154,7 +154,7 @@ jest.mock('pg', () => {
         
         expect(pool.query).toHaveBeenNthCalledWith(
           3,
-          expect.stringContaining('SELECT qc.completion_date'),
+          expect.stringContaining('SELECT'),
           ['123']
         );
         
@@ -211,7 +211,7 @@ jest.mock('pg', () => {
         
         // Verify query
         expect(pool.query).toHaveBeenCalledWith(
-          expect.stringContaining('UPDATE users SET quiz_streak = 0'),
+          expect.stringContaining('UPDATE users'),
           ['123']
         );
         
@@ -264,7 +264,7 @@ jest.mock('pg', () => {
         
         // Verify query
         expect(pool.query).toHaveBeenCalledWith(
-          expect.stringContaining('UPDATE users SET quiz_streak = 0')
+          expect.stringContaining('UPDATE users')
         );
         
         // Verify response

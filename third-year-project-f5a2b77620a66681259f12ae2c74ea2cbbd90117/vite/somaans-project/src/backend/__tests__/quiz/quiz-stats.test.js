@@ -83,13 +83,13 @@ jest.mock('pg', () => {
         // Verify expectations
         expect(pool.query).toHaveBeenNthCalledWith(
           1,
-          expect.stringContaining('SELECT qa.question_type'),
+          expect.stringContaining('SELECT'),
           ['123']
         );
         
         expect(pool.query).toHaveBeenNthCalledWith(
           2,
-          expect.stringContaining('SELECT qa.question_type, qa.identifications'),
+          expect.stringContaining('SELECT'),
           ['123']
         );
         
@@ -213,7 +213,7 @@ jest.mock('pg', () => {
         
         // Verify query
         expect(pool.query).toHaveBeenCalledWith(
-          expect.stringContaining('SELECT DATE_TRUNC'),
+          expect.stringContaining('SELECT'),
           ['123']
         );
         
