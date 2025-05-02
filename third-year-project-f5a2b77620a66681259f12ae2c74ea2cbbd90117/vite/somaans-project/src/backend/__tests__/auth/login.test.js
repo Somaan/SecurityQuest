@@ -46,7 +46,7 @@ describe('Login Endpoint', () => {
     };
     
     // Import and execute the handler
-    const server = require('../../../server');
+    const server = require('../../server');
     const loginHandler = server.__testables.loginHandler;
     await loginHandler(request, response);
     
@@ -79,7 +79,7 @@ describe('Login Endpoint', () => {
     };
     
     // Import and execute the handler
-    const server = require('../../../server');
+    const server = require('../../server');
     const loginHandler = server.__testables.loginHandler;
     await loginHandler(request, response);
     
@@ -133,7 +133,7 @@ describe('Login Endpoint', () => {
     });
     
     // Import and execute the handler
-    const server = require('../../../server');
+    const server = require('../../server');
     const loginHandler = server.__testables.loginHandler;
     await loginHandler(request, response);
     

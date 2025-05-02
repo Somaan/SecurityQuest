@@ -51,7 +51,7 @@ describe('Register Endpoint', () => {
     };
     
     // Import and execute the handler
-    const server = require('../../../server');
+    const server = require('../../server');
     const registerHandler = server.__testables.registerHandler;
     await registerHandler(request, response);
     
@@ -84,7 +84,7 @@ describe('Register Endpoint', () => {
     };
     
     // Import and execute the handler
-    const server = require('../../../server');
+    const server = require('../../server');
     const registerHandler = server.__testables.registerHandler;
     await registerHandler(request, response);
     
@@ -123,7 +123,7 @@ describe('Register Endpoint', () => {
     };
     
     // Import and execute the handler
-    const server = require('../../../server');
+    const server = require('../../server');
     const registerHandler = server.__testables.registerHandler;
     await registerHandler(request, response);
     

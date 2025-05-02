@@ -28,7 +28,7 @@ describe('Password Management', () => {
     jest.clearAllMocks();
     
     // Import the pool module and get the mock
-    pool = require('../db');
+    pool = require('../../db');
     
     // Create a mock req/res
     request = {
@@ -52,7 +52,7 @@ describe('Password Management', () => {
       };
       
       // Import and execute the handler
-      const server = require('../../../server');
+      const server = require('../../server');
       const forgotPasswordHandler = server.__testables.forgotPasswordHandler;
       await forgotPasswordHandler(request, response);
       
@@ -92,7 +92,7 @@ describe('Password Management', () => {
       const sgMail = require('@sendgrid/mail');
       
       // Import and execute the handler
-      const server = require('../../../server');
+      const server = require('../../server');
       const forgotPasswordHandler = server.__testables.forgotPasswordHandler;
       await forgotPasswordHandler(request, response);
       
@@ -126,7 +126,7 @@ describe('Password Management', () => {
       };
       
       // Import and execute the handler
-      const server = require('../../../server');
+      const server = require('../../server');
       const resetPasswordHandler = server.__testables.resetPasswordHandler;
       await resetPasswordHandler(request, response);
       
@@ -167,7 +167,7 @@ describe('Password Management', () => {
       };
       
       // Import and execute the handler
-      const server = require('../../../server');
+      const server = require('../../server');
       const resetPasswordHandler = server.__testables.resetPasswordHandler;
       await resetPasswordHandler(request, response);
       

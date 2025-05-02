@@ -17,7 +17,7 @@ jest.mock('pg', () => {
       jest.clearAllMocks();
       
       // Import the pool module and get the mock
-      pool = require('../db');
+      pool = require('../../db');
       
       // Create mock req/res objects
       request = {};
@@ -76,7 +76,7 @@ jest.mock('pg', () => {
         });
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.getUsersHandler) {
           console.log('Skipping test - handler not implemented');
@@ -122,7 +122,7 @@ jest.mock('pg', () => {
         pool.query.mockRejectedValueOnce(new Error('Database error'));
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.getUsersHandler) {
           console.log('Skipping test - handler not implemented');
@@ -163,7 +163,7 @@ jest.mock('pg', () => {
         });
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.getLoginHistoryHandler) {
           console.log('Skipping test - handler not implemented');
@@ -246,7 +246,7 @@ jest.mock('pg', () => {
         });
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.getQuizHistoryHandler) {
           console.log('Skipping test - handler not implemented');

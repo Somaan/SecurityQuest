@@ -17,7 +17,7 @@ jest.mock('pg', () => {
       jest.clearAllMocks();
       
       // Import the pool module and get the mock
-      pool = require('../db');
+      pool = require('../../db');
       
       // Create mock req/res objects
       request = {
@@ -39,7 +39,7 @@ jest.mock('pg', () => {
         request.params = { userId: '999' };
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         const getUserAchievementsHandler = server.__testables.getUserAchievementsHandler;
         await getUserAchievementsHandler(request, response);
         
@@ -113,7 +113,7 @@ jest.mock('pg', () => {
         request.params = { userId: '123' };
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         const getUserAchievementsHandler = server.__testables.getUserAchievementsHandler;
         await getUserAchievementsHandler(request, response);
         
@@ -197,7 +197,7 @@ jest.mock('pg', () => {
         request.params = { userId: '123' };
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         const getUserAchievementsHandler = server.__testables.getUserAchievementsHandler;
         await getUserAchievementsHandler(request, response);
         

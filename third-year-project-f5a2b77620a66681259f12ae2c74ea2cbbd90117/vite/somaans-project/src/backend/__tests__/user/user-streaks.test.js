@@ -17,7 +17,7 @@ jest.mock('pg', () => {
       jest.clearAllMocks();
       
       // Import the pool module and get the mock
-      pool = require('../db');
+      pool = require('../../db');
       
       // Create mock req/res objects
       request = {
@@ -40,7 +40,7 @@ jest.mock('pg', () => {
         pool.query.mockResolvedValueOnce({ rows: [] });
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.getUserStreaksHandler) {
           console.log('Skipping test - handler not implemented');
@@ -129,7 +129,7 @@ jest.mock('pg', () => {
         });
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.getUserStreaksHandler) {
           console.log('Skipping test - handler not implemented');
@@ -199,7 +199,7 @@ jest.mock('pg', () => {
         pool.query.mockResolvedValueOnce({ rows: [] });
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.resetUserStreaksHandler) {
           console.log('Skipping test - handler not implemented');
@@ -230,7 +230,7 @@ jest.mock('pg', () => {
         pool.query.mockRejectedValueOnce(new Error('Database error'));
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.resetUserStreaksHandler) {
           console.log('Skipping test - handler not implemented');
@@ -252,7 +252,7 @@ jest.mock('pg', () => {
         pool.query.mockResolvedValueOnce({ rows: [] });
         
         // Import server and execute handler
-        const server = require('../../../server');
+        const server = require('../../server');
         // Check if handler exists, if not just skip the test
         if (!server.__testables.resetAllStreaksHandler) {
           console.log('Skipping test - handler not implemented');

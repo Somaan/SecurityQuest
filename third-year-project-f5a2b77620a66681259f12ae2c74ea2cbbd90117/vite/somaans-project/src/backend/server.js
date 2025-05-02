@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 const app = express();
 
+// Check if running in test environment
+const isTestEnvironment = process.env.NODE_ENV === 'test' || require.main !== module;
+
 // Middleware
 app.use(cors({
     origin: [
@@ -17,9 +20,21 @@ app.use(cors({
     credentials: true  
   }));
 
-  app.use(express.json());
+app.use(express.json());
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+// Ensure dotenv is properly initialized whether running tests or main server
+try {
+    require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+} catch (error) {
+    console.error('Error loading .env file:', error);
+}
+
+// Initialize SendGrid only if API key is available
+if (process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+} else if (!isTestEnvironment) {
+    console.warn('Warning: SendGrid API Key not found in environment variables');
+}
 
 // API endpoint to get user achievements
 app.get('/api/users/:userId/achievements', async (req, res) => {
@@ -395,12 +410,14 @@ app.get('/api/users/:userId/threat-progress', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
-
-// Set SendGrid API Key
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Only start HTTP server if not in test environment
+if (!isTestEnvironment) {
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+} else {
+    console.log('Server imported as a module - not starting HTTP server');
+}
 
 // Initial API key check
 console.log('Testing environment setup...');
@@ -1395,3 +1412,92 @@ app.post('/api/quiz/complete', async (req, res) => {
         res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
+
+// Export handlers for testing purposes
+module.exports = {
+    // For testing purposes, export the handler functions
+    __testables: {
+        // Authentication handlers
+        loginHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/login')[0]
+                .route.stack[0].handle(req, res);
+        },
+        registerHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/register')[0]
+                .route.stack[0].handle(req, res);
+        },
+        forgotPasswordHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/forgot-password')[0]
+                .route.stack[0].handle(req, res);
+        },
+        resetPasswordHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/reset-password')[0]
+                .route.stack[0].handle(req, res);
+        },
+        
+        // Achievements handlers
+        getUserAchievementsHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/:userId/achievements')[0]
+                .route.stack[0].handle(req, res);
+        },
+        checkNewAchievementsHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/:userId/check-achievements')[0]
+                .route.stack[0].handle(req, res);
+        },
+        
+        // Quiz handlers
+        completeQuizHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/quiz/complete')[0]
+                .route.stack[0].handle(req, res);
+        },
+        getThreatPerformanceHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/:userId/threat-performance')[0]
+                .route.stack[0].handle(req, res);
+        },
+        getThreatProgressHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/:userId/threat-progress')[0]
+                .route.stack[0].handle(req, res);
+        },
+        
+        // User and leaderboard handlers
+        getUserStreaksHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/:userId/streaks')[0]
+                .route.stack[0].handle(req, res);
+        },
+        resetUserStreaksHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/:userId/reset-streaks')[0]
+                .route.stack[0].handle(req, res);
+        },
+        resetAllStreaksHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/admin/reset-all-streaks')[0]
+                .route.stack[0].handle(req, res);
+        },
+        getUsersHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users')[0]
+                .route.stack[0].handle(req, res);
+        },
+        getLoginHistoryHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/login-history')[0]
+                .route.stack[0].handle(req, res);
+        },
+        getQuizHistoryHandler: async (req, res) => {
+            return app._router.stack
+                .filter(layer => layer.route && layer.route.path === '/api/users/quiz-history')[0]
+                .route.stack[0].handle(req, res);
+        }
+    }
+};
