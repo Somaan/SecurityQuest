@@ -41,7 +41,6 @@
     ],
     "testMatch": [
       "/node_modules/",
-      "**/__tests__/**/!(setup|test-utils).js",
       "**/__tests__/**/*.test.js"
     ],
     "setupFilesAfterEnv": [
