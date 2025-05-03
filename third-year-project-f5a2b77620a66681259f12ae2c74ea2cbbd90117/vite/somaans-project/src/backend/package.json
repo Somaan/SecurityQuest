@@ -40,7 +40,6 @@
       "html"
     ],
     "testMatch": [
-      "/node_modules/",
       "**/__tests__/**/*.test.js"
     ],
     "setupFilesAfterEnv": [
