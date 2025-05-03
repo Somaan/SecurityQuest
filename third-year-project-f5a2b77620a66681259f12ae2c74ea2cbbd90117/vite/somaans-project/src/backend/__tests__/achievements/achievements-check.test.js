@@ -1,5 +1,3 @@
-// src/backend/__tests__/achievements/achievements-check.test.js
-
 // Mock modules
 jest.mock('pg', () => {
     const mPool = {

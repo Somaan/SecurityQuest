@@ -1,6 +1,3 @@
-// src/backend/__tests__/setup/test-utils.js
-// Common utility functions for tests
-
 /**
  * Creates a mock request object
  * @param {Object} options - Options to customize the mock

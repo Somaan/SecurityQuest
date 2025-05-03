@@ -1,4 +1,3 @@
-// src/backend/__tests__/db.test.js
 const { Pool } = require('pg');
 
 // Mock the pg module

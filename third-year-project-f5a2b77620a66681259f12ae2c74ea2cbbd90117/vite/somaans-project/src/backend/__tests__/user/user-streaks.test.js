@@ -1,5 +1,3 @@
-// src/backend/__tests__/user/user-streaks.test.js
-
 // Mock modules
 jest.mock('pg', () => {
     const mPool = {

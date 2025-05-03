@@ -1,5 +1,3 @@
-// src/backend/__tests__/quiz/quiz-stats.test.js
-
 // Mock modules
 jest.mock('pg', () => {
     const mPool = {

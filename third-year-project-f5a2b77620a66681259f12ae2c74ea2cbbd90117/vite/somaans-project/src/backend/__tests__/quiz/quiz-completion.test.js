@@ -1,5 +1,3 @@
-// src/backend/__tests__/quiz/quiz-completion.test.js
-
 // Mock modules
 jest.mock('pg', () => {
   const mPool = {
@@ -236,7 +234,7 @@ describe('Quiz Completion Endpoint', () => {
     const completeQuizHandler = server.__testables.completeQuizHandler;
     await completeQuizHandler(request, response);
     
-    // This is the key fix: Expect the server error that's actually occurring
+    // Expect the server error that's actually occurring
     expect(response.status).toHaveBeenCalledWith(500);
     expect(response.json).toHaveBeenCalledWith({
       error: "Server error", 

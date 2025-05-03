@@ -1,4 +1,3 @@
-// src/backend/__tests__/auth/register.test.js
 const bcrypt = require('bcrypt');
 
 // Mock modules

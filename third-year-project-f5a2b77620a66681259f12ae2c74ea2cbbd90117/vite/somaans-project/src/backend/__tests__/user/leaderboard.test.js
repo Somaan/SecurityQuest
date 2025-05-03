@@ -1,5 +1,3 @@
-// src/backend/__tests__/user/leaderboard.test.js
-
 // Mock modules
 jest.mock('pg', () => {
     const mPool = {

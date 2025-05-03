@@ -1,4 +1,3 @@
-// src/backend/__tests__/auth/login.test.js
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
