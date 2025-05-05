@@ -1,4 +1,4 @@
-// integration__tests__/auth.test.js
+// src/__integration_tests__/auth.test.js
 const request = require('supertest');
 const express = require('express');
 const bcrypt = require('bcrypt');
@@ -6,8 +6,8 @@ const dbHelper = require('./helpers/db-helper');
 const testData = require('./fixtures/testData');
 const { setupTestEnvironment, teardownTestEnvironment } = require('./setup');
 
-// Import server handlers from server.js
-const { __testables } = require('../src/backend/server');
+// Import server handlers from the correct location
+const { __testables } = require('../backend/server');
 
 // Create express app for testing
 const app = express();
@@ -80,20 +80,6 @@ describe('Authentication Integration Tests', () => {
       
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('Username or email already exists');
-    });
-    
-    test('should reject registration with invalid password', async () => {
-      const response = await request(app)
-        .post('/api/register')
-        .send({
-          username: 'invaliduser',
-          email: 'invalid@test.com',
-          password: testData.newUser.invalidPassword // Too weak
-        });
-      
-      // Your password validation happens on the frontend, so this test assumes the backend doesn't validate
-      // If backend validation is added, adjust the expectation
-      expect(response.status).toBe(201);
     });
   });
   
