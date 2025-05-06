@@ -55,6 +55,7 @@ const teardownTestEnvironment = async () => {
   
   try {
     await dbHelper.clearTestData();
+    await pool.end(); // Closing database 
     console.log('Test environment teardown complete');
   } catch (error) {
     console.error('Error tearing down test environment:', error);

@@ -39,10 +39,17 @@ async function getRememberToken(userId) {
  * Clear test data from all relevant tables
  */
 async function clearTestData() {
+  console.log("Clearing test data...");
   // Delete test users and their related data
   const testEmails = ['testuser@test.com', 'loginuser@test.com', 'resetuser@test.com'];
   
   for (const email of testEmails) {
+    try {
+      await pool.query('SELECT 1 as connection_test');
+    } catch (error) {
+      console.error('Database connection failed during clearTestData:', error);
+      throw error;
+    }
     try {
       const user = await getUserByEmail(email);
       if (user) {

@@ -27,12 +27,12 @@ describe('Authentication Integration Tests', () => {
   // Setup test environment before all tests
   beforeAll(async () => {
     await setupTestEnvironment();
-  });
+  }, 60000);
   
   // Clean up test environment after all tests
   afterAll(async () => {
     await teardownTestEnvironment();
-  });
+  }, 60000);
   
   describe('User Registration', () => {
     test('should register a new user successfully', async () => {
