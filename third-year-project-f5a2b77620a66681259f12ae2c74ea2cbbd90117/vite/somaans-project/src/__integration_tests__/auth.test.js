@@ -1,4 +1,7 @@
 // src/__integration_tests__/auth.test.js
+global.TextEncoder = require('util').TextEncoder;
+global.TextDecoder = require('util').TextDecoder;
+
 const request = require('supertest');
 const express = require('express');
 const bcrypt = require('bcrypt');

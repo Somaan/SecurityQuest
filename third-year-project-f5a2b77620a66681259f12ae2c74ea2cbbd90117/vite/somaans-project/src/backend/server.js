@@ -1067,7 +1067,6 @@ app.get('/api/users/:userId/streaks', async (req, res) => {
     }
 });
 
-// IMPROVED - Endpoint to record a quiz completion 
 app.post('/api/quiz/complete', async (req, res) => {
     const { 
         userId,
@@ -1412,6 +1411,733 @@ app.post('/api/quiz/complete', async (req, res) => {
         res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
+// Get questions by difficulty with randomization
+app.get('/api/quiz/questions/:difficulty', async (req, res) => {
+    const { difficulty } = req.params;
+    const { userId } = req.query; // Optional user ID for tracking seen questions
+    
+    try {
+        // Validate difficulty
+        const validDifficulties = ['Beginner', 'Intermediate', 'Advanced'];
+        if (!validDifficulties.includes(difficulty)) {
+            return res.status(400).json({ error: 'Invalid difficulty level' });
+        }
+        
+        // Get all questions of the specified difficulty
+        const questionsResult = await pool.query(
+            'SELECT id, question_text, question_type, explanation FROM questions WHERE difficulty = $1',
+            [difficulty]
+        );
+        
+        if (questionsResult.rows.length === 0) {
+            return res.status(404).json({ error: 'No questions found for this difficulty level' });
+        }
+        
+        let questionsToUse = questionsResult.rows;
+        
+        // If userId is provided, track which questions the user has seen
+        if (userId) {
+            // Get questions this user has already seen
+            const seenQuestionsResult = await pool.query(
+                'SELECT question_id FROM user_question_history WHERE user_id = $1 AND quiz_difficulty = $2',
+                [userId, difficulty]
+            );
+            
+            const seenQuestionIds = seenQuestionsResult.rows.map(row => row.question_id);
+            
+            // Prioritize questions the user hasn't seen yet
+            const unseenQuestions = questionsToUse.filter(q => !seenQuestionIds.includes(q.id));
+            const seenQuestions = questionsToUse.filter(q => seenQuestionIds.includes(q.id));
+            
+            // If there are enough unseen questions, use only those
+            if (unseenQuestions.length >= 5) {
+                questionsToUse = unseenQuestions;
+            } else {
+                // Otherwise, use all unseen questions + some seen ones (randomized)
+                seenQuestions.sort(() => Math.random() - 0.5);
+                questionsToUse = [...unseenQuestions, ...seenQuestions];
+            }
+        }
+        
+        // Randomize the order
+        questionsToUse.sort(() => Math.random() - 0.5);
+        
+        // Limit to 10 questions (or your desired quiz length)
+        questionsToUse = questionsToUse.slice(0, 10);
+        
+        // Create an array to store the full question data
+        const fullQuestions = [];
+        
+        // Fetch details for each question based on type
+        for (const question of questionsToUse) {
+            const questionId = question.id;
+            const questionType = question.question_type;
+            
+            // Common question data
+            const fullQuestion = {
+                id: questionId,
+                question: question.question_text,
+                type: questionType,
+                explanation: question.explanation
+            };
+            
+            // Fetch type-specific data
+            switch (questionType) {
+                case 'multiple_choice':
+                    const optionsResult = await pool.query(
+                        'SELECT id, option_text, is_correct, option_order FROM multiple_choice_options WHERE question_id = $1 ORDER BY option_order',
+                        [questionId]
+                    );
+                    
+                    fullQuestion.options = optionsResult.rows.map(row => row.option_text);
+                    
+                    // Find the index of the correct answer
+                    const correctOption = optionsResult.rows.find(row => row.is_correct);
+                    fullQuestion.correctAnswer = correctOption ? optionsResult.rows.indexOf(correctOption) : 0;
+                    
+                    break;
+                    
+                case 'email_phishing':
+                    // Fetch email content
+                    const emailResult = await pool.query(
+                        'SELECT * FROM email_phishing_content WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    if (emailResult.rows.length > 0) {
+                        const email = emailResult.rows[0];
+                        fullQuestion.emailContent = {
+                            from: email.email_from,
+                            to: email.email_to,
+                            subject: email.email_subject,
+                            date: email.email_date,
+                            body: email.email_body,
+                            signature: email.email_signature
+                        };
+                    }
+                    
+                    // Fetch suspicious elements
+                    const emailElementsResult = await pool.query(
+                        'SELECT * FROM suspicious_elements WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    fullQuestion.suspiciousElements = emailElementsResult.rows.map(element => ({
+                        id: element.element_id,
+                        description: element.description,
+                        field: element.field,
+                        content: element.content,
+                        type: element.type,
+                        isCorrect: element.is_correct,
+                        hint: element.hint,
+                        points: element.points
+                    }));
+                    
+                    // Whether unique type selection is required (optional feature)
+                    fullQuestion.uniqueTypeSelection = false;
+                    
+                    break;
+                    
+                case 'vishing':
+                    // Fetch call transcript
+                    const vishingResult = await pool.query(
+                        'SELECT * FROM vishing_content WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    if (vishingResult.rows.length > 0) {
+                        fullQuestion.callTranscript = vishingResult.rows[0].call_transcript;
+                    }
+                    
+                    // Fetch options
+                    const vishingOptionsResult = await pool.query(
+                        'SELECT * FROM vishing_options WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    fullQuestion.options = vishingOptionsResult.rows.map(option => ({
+                        id: option.option_id,
+                        text: option.option_text,
+                        isCorrect: option.is_correct,
+                        explanation: option.explanation
+                    }));
+                    
+                    break;
+                    
+                case 'smishing':
+                    // Fetch SMS content
+                    const smishingResult = await pool.query(
+                        'SELECT * FROM smishing_content WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    if (smishingResult.rows.length > 0) {
+                        const sms = smishingResult.rows[0];
+                        fullQuestion.messageContent = {
+                            from: sms.message_from,
+                            message: sms.message,
+                            timestamp: sms.timestamp
+                        };
+                    }
+                    
+                    // Fetch options
+                    const smishingOptionsResult = await pool.query(
+                        'SELECT * FROM smishing_options WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    fullQuestion.options = smishingOptionsResult.rows.map(option => ({
+                        id: option.option_id,
+                        text: option.option_text,
+                        isCorrect: option.is_correct
+                    }));
+                    
+                    break;
+                    
+                case 'website_phishing':
+                    // Fetch website image
+                    const websiteResult = await pool.query(
+                        'SELECT * FROM website_phishing_content WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    if (websiteResult.rows.length > 0) {
+                        fullQuestion.websiteImage = websiteResult.rows[0].website_image_url;
+                    }
+                    
+                    // Fetch suspicious elements with coordinates
+                    const websiteElementsResult = await pool.query(
+                        'SELECT * FROM suspicious_elements WHERE question_id = $1',
+                        [questionId]
+                    );
+                    
+                    fullQuestion.suspiciousElements = websiteElementsResult.rows.map(element => ({
+                        id: element.element_id,
+                        description: element.description,
+                        isCorrect: element.is_correct,
+                        hint: element.hint,
+                        points: element.points,
+                        coordinates: {
+                            top: element.coordinates_top,
+                            left: element.coordinates_left,
+                            width: element.coordinates_width,
+                            height: element.coordinates_height
+                        }
+                    }));
+                    
+                    break;
+            }
+            
+            fullQuestions.push(fullQuestion);
+        }
+        
+        // Record these questions as "seen" by this user if userId is provided
+        if (userId) {
+            for (const question of questionsToUse) {
+                try {
+                    await pool.query(
+                        `INSERT INTO user_question_history (user_id, question_id, quiz_difficulty)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (user_id, question_id) DO UPDATE
+                        SET viewed_at = CURRENT_TIMESTAMP`,
+                        [userId, question.id, difficulty]
+                    );
+                } catch (error) {
+                    console.error(`Error recording question history for user ${userId}, question ${question.id}:`, error);
+                    // Continue with other questions
+                }
+            }
+        }
+        
+        res.json({
+            success: true,
+            questions: fullQuestions
+        });
+        
+    } catch (error) {
+        console.error('Error fetching quiz questions:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Add a new question (admin endpoint)
+app.post('/api/quiz/questions', async (req, res) => {
+    const { 
+        question_text, 
+        question_type, 
+        difficulty, 
+        explanation,
+        questionData // Contains type-specific data
+    } = req.body;
+    
+    // Start a database transaction
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        // Insert the base question
+        const questionResult = await client.query(
+            `INSERT INTO questions 
+            (question_text, question_type, difficulty, explanation) 
+            VALUES ($1, $2, $3, $4) 
+            RETURNING id`,
+            [question_text, question_type, difficulty, explanation]
+        );
+        
+        const questionId = questionResult.rows[0].id;
+        
+        // Process type-specific data
+        switch (question_type) {
+            case 'multiple_choice':
+                // Insert options
+                for (let i = 0; i < questionData.options.length; i++) {
+                    const option = questionData.options[i];
+                    await client.query(
+                        `INSERT INTO multiple_choice_options 
+                        (question_id, option_text, is_correct, option_order) 
+                        VALUES ($1, $2, $3, $4)`,
+                        [questionId, option.text, option.isCorrect, i]
+                    );
+                }
+                break;
+                
+            case 'email_phishing':
+                // Insert email content
+                await client.query(
+                    `INSERT INTO email_phishing_content 
+                    (question_id, email_from, email_to, email_subject, email_date, email_body, email_signature) 
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [
+                        questionId, 
+                        questionData.emailContent.from, 
+                        questionData.emailContent.to, 
+                        questionData.emailContent.subject, 
+                        questionData.emailContent.date, 
+                        questionData.emailContent.body, 
+                        questionData.emailContent.signature
+                    ]
+                );
+                
+                // Insert suspicious elements
+                for (const element of questionData.suspiciousElements) {
+                    await client.query(
+                        `INSERT INTO suspicious_elements 
+                        (question_id, element_id, description, field, content, type, is_correct, hint, points) 
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                        [
+                            questionId, 
+                            element.id, 
+                            element.description, 
+                            element.field, 
+                            element.content, 
+                            element.type, 
+                            element.isCorrect !== false, 
+                            element.hint, 
+                            element.points || 10
+                        ]
+                    );
+                }
+                break;
+                
+            case 'vishing':
+                // Insert call transcript
+                await client.query(
+                    `INSERT INTO vishing_content 
+                    (question_id, call_transcript) 
+                    VALUES ($1, $2)`,
+                    [questionId, questionData.callTranscript]
+                );
+                
+                // Insert options
+                for (const option of questionData.options) {
+                    await client.query(
+                        `INSERT INTO vishing_options 
+                        (question_id, option_id, option_text, is_correct, explanation) 
+                        VALUES ($1, $2, $3, $4, $5)`,
+                        [
+                            questionId, 
+                            option.id, 
+                            option.text, 
+                            option.isCorrect, 
+                            option.explanation
+                        ]
+                    );
+                }
+                break;
+                
+            case 'smishing':
+                // Insert SMS content
+                await client.query(
+                    `INSERT INTO smishing_content 
+                    (question_id, message_from, message, timestamp) 
+                    VALUES ($1, $2, $3, $4)`,
+                    [
+                        questionId, 
+                        questionData.messageContent.from, 
+                        questionData.messageContent.message, 
+                        questionData.messageContent.timestamp
+                    ]
+                );
+                
+                // Insert options
+                for (const option of questionData.options) {
+                    await client.query(
+                        `INSERT INTO smishing_options 
+                        (question_id, option_id, option_text, is_correct) 
+                        VALUES ($1, $2, $3, $4)`,
+                        [questionId, option.id, option.text, option.isCorrect]
+                    );
+                }
+                break;
+                
+            case 'website_phishing':
+                // Insert website image
+                await client.query(
+                    `INSERT INTO website_phishing_content 
+                    (question_id, website_image_url) 
+                    VALUES ($1, $2)`,
+                    [questionId, questionData.websiteImage]
+                );
+                
+                // Insert suspicious elements with coordinates
+                for (const element of questionData.suspiciousElements) {
+                    await client.query(
+                        `INSERT INTO suspicious_elements 
+                        (question_id, element_id, description, is_correct, hint, points, 
+                         coordinates_top, coordinates_left, coordinates_width, coordinates_height) 
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                        [
+                            questionId, 
+                            element.id, 
+                            element.description, 
+                            element.isCorrect !== false, 
+                            element.hint, 
+                            element.points || 10,
+                            element.coordinates.top,
+                            element.coordinates.left,
+                            element.coordinates.width,
+                            element.coordinates.height
+                        ]
+                    );
+                }
+                break;
+        }
+        
+        await client.query('COMMIT');
+        
+        res.status(201).json({
+            success: true,
+            message: 'Question created successfully',
+            questionId
+        });
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error creating question:', error);
+        res.status(500).json({ error: 'Server error' });
+    } finally {
+        client.release();
+    }
+});
+
+// Get analytics on question performance
+app.get('/api/quiz/questions/:questionId/analytics', async (req, res) => {
+    const { questionId } = req.params;
+    
+    try {
+        // Get question info
+        const questionResult = await pool.query(
+            'SELECT question_text, question_type, difficulty FROM questions WHERE id = $1',
+            [questionId]
+        );
+        
+        if (questionResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Question not found' });
+        }
+        
+        const question = questionResult.rows[0];
+        
+        // Get attempts for this question
+        const attemptsResult = await pool.query(`
+            SELECT 
+                qa.is_correct, 
+                qa.earned_points, 
+                qa.max_points,
+                COUNT(*) as attempt_count
+            FROM quiz_answers qa
+            JOIN quiz_completions qc ON qa.completion_id = qc.id
+            WHERE qa.question_index = $1
+            GROUP BY qa.is_correct, qa.earned_points, qa.max_points
+        `, [questionId]);
+        
+        // Calculate success rate
+        let totalAttempts = 0;
+        let correctAttempts = 0;
+        let averagePoints = 0;
+        let totalPoints = 0;
+        let totalMaxPoints = 0;
+        
+        attemptsResult.rows.forEach(row => {
+            const count = parseInt(row.attempt_count);
+            totalAttempts += count;
+            
+            if (row.is_correct) {
+                correctAttempts += count;
+            }
+            
+            if (row.earned_points && row.max_points) {
+                totalPoints += parseFloat(row.earned_points) * count;
+                totalMaxPoints += parseFloat(row.max_points) * count;
+            }
+        });
+        
+        const successRate = totalAttempts > 0 ? (correctAttempts / totalAttempts) * 100 : 0;
+        averagePoints = totalMaxPoints > 0 ? (totalPoints / totalMaxPoints) * 100 : 0;
+        
+        res.json({
+            success: true,
+            question: {
+                id: questionId,
+                text: question.question_text,
+                type: question.question_type,
+                difficulty: question.difficulty
+            },
+            analytics: {
+                totalAttempts,
+                correctAttempts,
+                successRate: Math.round(successRate * 10) / 10,
+                averagePointsPercentage: Math.round(averagePoints * 10) / 10
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error fetching question analytics:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+// Admin endpoint to migrate quiz questions
+// Add this endpoint to server.js to handle question migration
+app.post('/api/admin/migrate-questions', async (req, res) => {
+    try {
+      // Get quiz data from request body
+      const { quizData } = req.body;
+      
+      if (!quizData) {
+        return res.status(400).json({ error: 'Missing quiz data in request' });
+      }
+      
+      // Track statistics
+      const stats = {
+        total: 0,
+        successful: 0,
+        failed: 0,
+        byType: {}
+      };
+      
+      // Get a client for transaction support
+      const client = await pool.connect();
+      
+      try {
+        // Process each difficulty level
+        const difficulties = Object.keys(quizData);
+        for (const difficulty of difficulties) {
+          console.log(`Processing ${difficulty} questions...`);
+          const questions = quizData[difficulty];
+          
+          for (let i = 0; i < questions.length; i++) {
+            const question = questions[i];
+            stats.total++;
+            
+            // Track by type
+            const questionType = question.type || 'multiple_choice';
+            stats.byType[questionType] = (stats.byType[questionType] || 0) + 1;
+            
+            try {
+              // Start transaction
+              await client.query('BEGIN');
+              
+              // Insert base question
+              const questionResult = await client.query(
+                `INSERT INTO questions 
+                (question_text, question_type, difficulty, explanation) 
+                VALUES ($1, $2, $3, $4) 
+                RETURNING id`,
+                [question.question, questionType, difficulty, question.explanation]
+              );
+              
+              const questionId = questionResult.rows[0].id;
+              
+              // Handle different question types
+              switch (questionType) {
+                case 'multiple_choice':
+                  // Insert options
+                  for (let j = 0; j < question.options.length; j++) {
+                    const option = question.options[j];
+                    const isCorrect = j === question.correctAnswer;
+                    
+                    await client.query(
+                      `INSERT INTO multiple_choice_options 
+                      (question_id, option_text, is_correct, option_order) 
+                      VALUES ($1, $2, $3, $4)`,
+                      [questionId, option, isCorrect, j]
+                    );
+                  }
+                  break;
+                  
+                case 'email_phishing':
+                  // Insert email content
+                  await client.query(
+                    `INSERT INTO email_phishing_content 
+                    (question_id, email_from, email_to, email_subject, email_date, email_body, email_signature) 
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [
+                      questionId, 
+                      question.emailContent.from, 
+                      question.emailContent.to, 
+                      question.emailContent.subject, 
+                      question.emailContent.date, 
+                      question.emailContent.body, 
+                      question.emailContent.signature || null
+                    ]
+                  );
+                  
+                  // Insert suspicious elements
+                  for (const element of question.suspiciousElements) {
+                    await client.query(
+                      `INSERT INTO suspicious_elements 
+                      (question_id, element_id, description, field, content, type, is_correct, hint, points) 
+                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                      [
+                        questionId, 
+                        element.id, 
+                        element.description, 
+                        element.field || null, 
+                        element.content || null, 
+                        element.type || null, 
+                        element.isCorrect !== false, // Default to true if not specified
+                        element.hint || null, 
+                        element.points || 10
+                      ]
+                    );
+                  }
+                  break;
+                  
+                case 'vishing':
+                  // Insert call transcript
+                  await client.query(
+                    `INSERT INTO vishing_content 
+                    (question_id, call_transcript) 
+                    VALUES ($1, $2)`,
+                    [questionId, question.callTranscript]
+                  );
+                  
+                  // Insert options
+                  for (const option of question.options) {
+                    await client.query(
+                      `INSERT INTO vishing_options 
+                      (question_id, option_id, option_text, is_correct, explanation) 
+                      VALUES ($1, $2, $3, $4, $5)`,
+                      [
+                        questionId, 
+                        option.id, 
+                        option.text, 
+                        option.isCorrect || false, 
+                        option.explanation || null
+                      ]
+                    );
+                  }
+                  break;
+                  
+                case 'smishing':
+                  // Insert SMS content
+                  await client.query(
+                    `INSERT INTO smishing_content 
+                    (question_id, message_from, message, timestamp) 
+                    VALUES ($1, $2, $3, $4)`,
+                    [
+                      questionId, 
+                      question.messageContent.from, 
+                      question.messageContent.message, 
+                      question.messageContent.timestamp
+                    ]
+                  );
+                  
+                  // Insert options
+                  for (const option of question.options) {
+                    await client.query(
+                      `INSERT INTO smishing_options 
+                      (question_id, option_id, option_text, is_correct) 
+                      VALUES ($1, $2, $3, $4)`,
+                      [questionId, option.id, option.text, option.isCorrect || false]
+                    );
+                  }
+                  break;
+                  
+                case 'website_phishing':
+                  // Insert website image
+                  await client.query(
+                    `INSERT INTO website_phishing_content 
+                    (question_id, website_image_url) 
+                    VALUES ($1, $2)`,
+                    [questionId, question.websiteImage]
+                  );
+                  
+                  // Insert suspicious elements with coordinates
+                  for (const element of question.suspiciousElements) {
+                    await client.query(
+                      `INSERT INTO suspicious_elements 
+                      (question_id, element_id, description, is_correct, hint, points,
+                       coordinates_top, coordinates_left, coordinates_width, coordinates_height) 
+                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                      [
+                        questionId, 
+                        element.id, 
+                        element.description, 
+                        element.isCorrect !== false, // Default to true if not specified
+                        element.hint || null, 
+                        element.points || 10,
+                        element.coordinates?.top,
+                        element.coordinates?.left,
+                        element.coordinates?.width,
+                        element.coordinates?.height
+                      ]
+                    );
+                  }
+                  break;
+              }
+              
+              await client.query('COMMIT');
+              stats.successful++;
+              console.log(`✓ Migrated ${difficulty} question ${i + 1} (${questionType})`);
+              
+            } catch (error) {
+              await client.query('ROLLBACK');
+              stats.failed++;
+              console.error(`✗ Failed to migrate ${difficulty} question ${i + 1}:`, error);
+            }
+          }
+        }
+        
+        res.json({
+          success: true,
+          message: 'Quiz questions migration completed',
+          stats: stats
+        });
+        
+      } catch (error) {
+        console.error('Migration failed:', error);
+        res.status(500).json({ error: 'Migration failed', details: error.message });
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('Error in migration process:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
+  });
 
 // Export handlers for testing purposes
 module.exports = {

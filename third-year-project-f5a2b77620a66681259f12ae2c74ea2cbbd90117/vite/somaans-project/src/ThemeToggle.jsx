@@ -5,20 +5,16 @@ import { faSun, faMoon } from "@fortawesome/free-solid-svg-icons";
 
 const ThemeToggle = () => {
   const { theme, toggleTheme } = useContext(ThemeContext);
+  const isLight = theme === "light";
 
   return (
     <button
       onClick={toggleTheme}
-      className="theme-toggle-btn"
-      aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+      className={`theme-toggle-btn ${isLight ? "light-toggle" : "dark-toggle"}`}
+      aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
     >
-      <FontAwesomeIcon
-        icon={theme === "light" ? faMoon : faSun}
-        className="theme-icon"
-      />
-      <span className="theme-label">
-        {theme === "light" ? "Dark" : "Light"} Mode
-      </span>
+      <FontAwesomeIcon icon={isLight ? faMoon : faSun} className="theme-icon" />
+      <span className="theme-label">{isLight ? "Dark" : "Light"} Mode</span>
 
       <style jsx>{`
         .theme-toggle-btn {
@@ -30,28 +26,28 @@ const ThemeToggle = () => {
           border: none;
           cursor: pointer;
           transition: all 0.3s ease;
-          margin-left: auto;
-          margin-right: 12px;
+          margin-left: 10px;
+          margin-right: 10px;
         }
 
-        /* Dark Theme Button Styles (when in light mode) */
-        .light-theme .theme-toggle-btn {
+        .dark-toggle {
+          background-color: #2c3e50;
+          color: #f0f0f0;
+        }
+
+        .dark-toggle:hover {
+          background-color: #3a4b5c;
+          color: #ffffff;
+        }
+
+        .light-toggle {
           background-color: #e0e0e0;
           color: #333;
         }
 
-        .light-theme .theme-toggle-btn:hover {
+        .light-toggle:hover {
           background-color: #d0d0d0;
-        }
-
-        /* Light Theme Button Styles (when in dark mode) */
-        .dark-theme .theme-toggle-btn {
-          background-color: #333;
-          color: #f0f0f0;
-        }
-
-        .dark-theme .theme-toggle-btn:hover {
-          background-color: #444;
+          color: #222;
         }
 
         .theme-icon {

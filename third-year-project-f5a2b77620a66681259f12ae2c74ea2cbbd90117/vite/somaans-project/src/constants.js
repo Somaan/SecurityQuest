@@ -24,7 +24,7 @@ export const API_ENDPOINTS = {
   COMPLETE_QUIZ: `${API_BASE_URL}/quiz/complete`,
   GET_USER_ACHIEVEMENTS: `${API_BASE_URL}/users/:userId/achievements`,
   CHECK_NEW_ACHIEVEMENTS: `${API_BASE_URL}/users/:userId/check-achievements`,
-  GET_QUIZ_QUESTIONS: `${API_BASE_URL}/quiz/questions`, // Future endpoint for quiz questions
+  GET_QUIZ_QUESTIONS: `${API_BASE_URL}/quiz/questions/:difficulty`, 
   GET_USER_THREAT_PERFORMANCE: `${API_BASE_URL}/users/:userId/threat-performance`, // New endpoint for threat identification stats
   
   // Add a mock API for development
@@ -182,7 +182,7 @@ export const QUIZ_CONFIG = {
           "Phishing attempts made through social media"
         ],
         correctAnswer: 1,
-        explanation: "Spear phishing refers to targeted attacks aimed at specific individuals or organizations, often using personalized information to appear more credible."
+        explanation: "Spear phishing refers to targeted attacks aimed at specific individuals or organisations, often using personalised information to appear more credible."
       },
       {
         id: 6,
@@ -469,7 +469,7 @@ The Amazon Security Team
           "A DDoS attack that floods servers with requests"
         ],
         correctAnswer: 1,
-        explanation: "A watering hole attack targets organizations by infecting websites they frequently visit with malware, rather than attacking them directly."
+        explanation: "A watering hole attack targets organisations by infecting websites they frequently visit with malware, rather than attacking them directly."
       },
       {
         id: 2,
@@ -505,7 +505,7 @@ The Amazon Security Team
           "Human Resources"
         ],
         correctAnswer: 2,
-        explanation: "Finance departments are often targeted because they have direct access to financial systems and can authorize payments, making them prime targets for BEC and wire fraud attacks."
+        explanation: "Finance departments are often targeted because they have direct access to financial systems and can authorise payments, making them prime targets for BEC and wire fraud attacks."
       },
       {
         id: 5,

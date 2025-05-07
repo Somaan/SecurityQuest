@@ -20,6 +20,8 @@ const QuizQuestions = () => {
   const [answeredState, setAnsweredState] = useState(null); // null, 'correct', or 'incorrect'
   const [isLoading, setIsLoading] = useState(true);
   const [showStreakBanner, setShowStreakBanner] = useState(false);
+  const [questions, setQuestions] = useState([]);
+  const [error, setError] = useState(null);
 
   // Track start time for quiz duration
   const [startTime, setStartTime] = useState(null);
@@ -33,22 +35,62 @@ const QuizQuestions = () => {
   const difficulty = location.state?.difficulty || "Beginner";
   const quizId = QUIZ_CONFIG.QUIZ_IDS[difficulty] || 1;
 
-  // Get questions for selected difficulty
-  const questions = QUIZ_CONFIG.MOCK_QUIZ_DATA[difficulty] || [];
-
   // Set start time when component mounts
   useEffect(() => {
     setStartTime(new Date());
   }, []);
 
-  // Simulate loading questions
+  // Fetch questions from the database
+  // Fetch questions from the database
   useEffect(() => {
-    const loadTimer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    const fetchQuestions = async () => {
+      setIsLoading(true);
+      try {
+        // Generate a unique submission ID for this quiz attempt
+        const submissionId = `${userId}-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 15)}`;
+        sessionStorage.setItem("currentQuizSubmissionId", submissionId);
 
-    return () => clearTimeout(loadTimer);
-  }, []);
+        // Fetch questions from the API
+        const endpoint = API_ENDPOINTS.GET_QUIZ_QUESTIONS.replace(
+          ":difficulty",
+          difficulty
+        );
+        const response = await fetch(`${endpoint}?userId=${userId}`);
+
+        if (!response.ok) {
+          throw new Error(`Error fetching questions: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.questions && data.questions.length > 0) {
+          setQuestions(data.questions);
+        } else {
+          throw new Error("No questions returned from the server");
+        }
+
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Error fetching questions:", err);
+        setError(err.message);
+        setIsLoading(false);
+
+        // Fallback to mock data if available
+        if (
+          QUIZ_CONFIG.MOCK_QUIZ_DATA &&
+          QUIZ_CONFIG.MOCK_QUIZ_DATA[difficulty]
+        ) {
+          console.log("Using fallback mock data");
+          setQuestions(QUIZ_CONFIG.MOCK_QUIZ_DATA[difficulty]);
+          setError(null);
+        }
+      }
+    };
+
+    fetchQuestions();
+  }, [difficulty, userId]);
 
   // Effect for timer countdown
   useEffect(() => {
@@ -109,6 +151,7 @@ const QuizQuestions = () => {
           correctOption: currentQuestion.options[currentQuestion.correctAnswer],
           isCorrect: false,
           score: 0,
+          questionIndex: currentQuestionIndex,
         };
         setUserAnswers(updatedAnswers);
         setAnsweredState("incorrect");
@@ -132,6 +175,7 @@ const QuizQuestions = () => {
         correctOption: currentQuestion.options[currentQuestion.correctAnswer],
         isCorrect,
         score: isCorrect ? 100 : 0,
+        questionIndex: currentQuestionIndex,
       };
 
       setUserAnswers(updatedAnswers);
@@ -168,6 +212,7 @@ const QuizQuestions = () => {
       type: currentQuestion.type,
       details: answer.details,
       score: answer.score,
+      questionIndex: currentQuestionIndex,
     };
 
     setUserAnswers(updatedAnswers);
@@ -265,18 +310,64 @@ const QuizQuestions = () => {
       quizId,
       consecutiveCorrect: correctStreak,
       duration: quizDuration, // Add duration to results
+      submissionId: sessionStorage.getItem("currentQuizSubmissionId"),
     };
 
-    // Check for quiz completion achievements
-    const quizAchievements =
-      AchievementService.checkQuizAchievements(quizResults);
-    quizAchievements.forEach((achievement) => {
-      AchievementService.queueAchievement(achievement);
-    });
+    // Submit quiz results to the server
+    const submitQuizResults = async () => {
+      try {
+        const response = await fetch(
+          `${API_ENDPOINTS.BASE_URL}/api/quiz/complete`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: userId,
+              quizId: quizId,
+              score: averageScore,
+              totalQuestions: questions.length,
+              correctAnswers: userAnswers.filter(
+                (answer) =>
+                  answer.isCorrect || (answer.score && answer.score >= 70)
+              ).length,
+              duration: quizDuration,
+              completionDetails: userAnswers,
+              submissionId: quizResults.submissionId,
+            }),
+          }
+        );
 
-    // Navigate to results page
-    navigate("/quiz/results", {
-      state: quizResults,
+        const data = await response.json();
+
+        if (data.success) {
+          console.log("Quiz results saved successfully:", data);
+
+          // Update streak data in quiz results
+          quizResults.quizStreak = data.quizStreak;
+          quizResults.longestQuizStreak = data.longestQuizStreak;
+        } else {
+          console.error("Error saving quiz results:", data.error);
+        }
+      } catch (error) {
+        console.error("Error submitting quiz results:", error);
+      }
+    };
+
+    // Submit results and then navigate
+    submitQuizResults().then(() => {
+      // Check for quiz completion achievements
+      const quizAchievements =
+        AchievementService.checkQuizAchievements(quizResults);
+      quizAchievements.forEach((achievement) => {
+        AchievementService.queueAchievement(achievement);
+      });
+
+      // Navigate to results page
+      navigate("/quiz/results", {
+        state: quizResults,
+      });
     });
   };
 
@@ -302,6 +393,39 @@ const QuizQuestions = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="quiz-container">
+        <div className="error-message">
+          <p>Error loading questions: {error}</p>
+          <button
+            className="exit-btn"
+            onClick={() => navigate("/quiz/difficulty")}
+          >
+            Back to Difficulty Selection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if questions are available
+  if (!questions || questions.length === 0) {
+    return (
+      <div className="quiz-container">
+        <div className="error-message">
+          <p>No questions available for this difficulty level.</p>
+          <button
+            className="exit-btn"
+            onClick={() => navigate("/quiz/difficulty")}
+          >
+            Back to Difficulty Selection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Current question
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -309,7 +433,7 @@ const QuizQuestions = () => {
     return (
       <div className="quiz-container">
         <div className="error-message">
-          <p>No questions available for this difficulty level.</p>
+          <p>Question data is not available.</p>
           <button
             className="exit-btn"
             onClick={() => navigate("/quiz/difficulty")}
