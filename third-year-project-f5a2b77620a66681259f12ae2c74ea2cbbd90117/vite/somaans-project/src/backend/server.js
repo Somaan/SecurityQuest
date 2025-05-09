@@ -90,6 +90,50 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
         };
       });
       
+      // Pre-fetch all the data needed for achievements
+      // Beginner quizzes
+      const beginnerQuizCountResult = await pool.query(`
+        SELECT COUNT(*) as count FROM quiz_completions
+        WHERE user_id = $1 AND quiz_id = 1
+      `, [userId]);
+      const beginnerQuizCount = parseInt(beginnerQuizCountResult.rows[0].count || 0);
+      
+      // Intermediate quizzes
+      const intermediateQuizCountResult = await pool.query(`
+        SELECT COUNT(*) as count FROM quiz_completions
+        WHERE user_id = $1 AND quiz_id = 2
+      `, [userId]);
+      const intermediateQuizCount = parseInt(intermediateQuizCountResult.rows[0].count || 0);
+      
+      // Advanced quizzes
+      const advancedQuizCountResult = await pool.query(`
+        SELECT COUNT(*) as count FROM quiz_completions
+        WHERE user_id = $1 AND quiz_id = 3
+      `, [userId]);
+      const advancedQuizCount = parseInt(advancedQuizCountResult.rows[0].count || 0);
+      
+      // Perfect scores
+      const perfectScoresResult = await pool.query(`
+        SELECT COUNT(*) as count FROM quiz_completions
+        WHERE user_id = $1 AND score = 100
+      `, [userId]);
+      const hasPerfectScore = parseInt(perfectScoresResult.rows[0].count || 0) > 0;
+      
+      // Email identifications
+      const emailIdentificationsResult = await pool.query(`
+        SELECT SUM(
+          CASE WHEN identifications IS NOT NULL
+          THEN JSONB_ARRAY_LENGTH(identifications->'truePositives')
+          ELSE 0 END
+        ) as count
+        FROM quiz_answers
+        WHERE completion_id IN (
+          SELECT id FROM quiz_completions WHERE user_id = $1
+        )
+        AND question_type = 'email_phishing'
+      `, [userId]);
+      const emailIdentificationsCount = parseInt(emailIdentificationsResult.rows[0].count || 0);
+      
       // Process achievements with current status for this user
       const achievements = achievementsResult.rows.map(achievement => {
         let unlocked = false;
@@ -102,7 +146,6 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
           progress = userAchievementsMap[achievement.id].progress;
           unlockDate = userAchievementsMap[achievement.id].unlockDate;
         } else {
-        
           // Calculate achievement status based on user stats  
           switch(achievement.achievement_type) {
             case 'login_streak':
@@ -110,12 +153,10 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
                 const effectiveStreak = Math.max(stats.login_streak || 0, stats.longest_login_streak || 0);
                 unlocked = stats.login_streak >= 3 || stats.longest_login_streak >= 3;
                 progress = Math.min(100, (effectiveStreak / 3) * 100);
-
               } else if (achievement.title === 'Weekly Warrior') {
                 const effectiveStreak = Math.max(stats.login_streak || 0, stats.longest_login_streak || 0);
                 unlocked = stats.login_streak >= 7 || stats.longest_login_streak >= 7;
                 progress = Math.min(100, (effectiveStreak / 7) * 100);
-
               } else if (achievement.title === 'Monthly Master') {
                 const effectiveStreak = Math.max(stats.login_streak || 0, stats.longest_login_streak || 0);
                 unlocked = stats.login_streak >= 30 || stats.longest_login_streak >= 30;
@@ -146,9 +187,25 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
               } else if (achievement.title === 'Quiz Master') {
                 unlocked = stats.total_quizzes >= 10;
                 progress = Math.min(100, (stats.total_quizzes / 10) * 100);
+              } else if (achievement.title === 'Beginner\'s Badge') {
+                // Use pre-fetched data
+                unlocked = beginnerQuizCount >= 5;
+                progress = Math.min(100, (beginnerQuizCount / 5) * 100);
+              } else if (achievement.title === 'Intermediate Guardian') {
+                // Use pre-fetched data
+                unlocked = intermediateQuizCount >= 5;
+                progress = Math.min(100, (intermediateQuizCount / 5) * 100);
+              } else if (achievement.title === 'Advanced Defender') {
+                // Use pre-fetched data
+                unlocked = advancedQuizCount >= 5;
+                progress = Math.min(100, (advancedQuizCount / 5) * 100);
+              } else if (achievement.title === 'Perfect Score') {
+                // Use pre-fetched data
+                unlocked = hasPerfectScore;
+                progress = hasPerfectScore ? 100 : 0;
               }
               break;
-              
+            
             case 'login_count':
               if (achievement.title === 'Regular User') {
                 unlocked = stats.total_logins >= 10;
@@ -156,8 +213,13 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
               }
               break;
             
-            
-            
+            case 'threat_identification':
+              if (achievement.title === 'Email Vigilance') {
+                // Use pre-fetched data
+                unlocked = emailIdentificationsCount >= 15;
+                progress = Math.min(100, (emailIdentificationsCount / 15) * 100);
+              }
+              break;
           }
           
           // If we've just determined that an achievement is unlocked, save it
@@ -1419,6 +1481,7 @@ app.post('/api/quiz/complete', async (req, res) => {
         res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
+
 // Get questions by difficulty with randomization
 app.get('/api/quiz/questions/:difficulty', async (req, res) => {
     const { difficulty } = req.params;
