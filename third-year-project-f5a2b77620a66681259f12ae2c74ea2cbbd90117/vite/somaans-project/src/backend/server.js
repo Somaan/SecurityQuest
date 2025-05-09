@@ -107,14 +107,19 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
           switch(achievement.achievement_type) {
             case 'login_streak':
               if (achievement.title === 'Dedicated User') {
+                const effectiveStreak = Math.max(stats.login_streak || 0, stats.longest_login_streak || 0);
                 unlocked = stats.login_streak >= 3 || stats.longest_login_streak >= 3;
-                progress = Math.min(100, (stats.login_streak / 3) * 100);
+                progress = Math.min(100, (effectiveStreak / 3) * 100);
+
               } else if (achievement.title === 'Weekly Warrior') {
+                const effectiveStreak = Math.max(stats.login_streak || 0, stats.longest_login_streak || 0);
                 unlocked = stats.login_streak >= 7 || stats.longest_login_streak >= 7;
-                progress = Math.min(100, (stats.login_streak / 7) * 100);
+                progress = Math.min(100, (effectiveStreak / 7) * 100);
+
               } else if (achievement.title === 'Monthly Master') {
+                const effectiveStreak = Math.max(stats.login_streak || 0, stats.longest_login_streak || 0);
                 unlocked = stats.login_streak >= 30 || stats.longest_login_streak >= 30;
-                progress = Math.min(100, (stats.login_streak / 30) * 100);
+                progress = Math.min(100, (effectiveStreak / 30) * 100);
               }
               break;
               
@@ -150,6 +155,9 @@ app.get('/api/users/:userId/achievements', async (req, res) => {
                 progress = Math.min(100, (stats.total_logins / 10) * 100);
               }
               break;
+            
+            
+            
           }
           
           // If we've just determined that an achievement is unlocked, save it
