@@ -112,25 +112,36 @@ const Achievements = () => {
 
     fetchAchievements();
 
-    // Check for any streak achievements when the component loads
-    const checkForStreakAchievements = async () => {
+    const checkForAllAchievements = async () => {
       try {
-        const newAchievements =
+        console.log("Checking for all achievements...");
+
+        // Check streak achievement
+        const newStreakAchievements =
           await AchievementService.checkStreakAchievements(userId);
-        if (newAchievements && newAchievements.length > 0) {
-          console.log("Found new streak achievements:", newAchievements);
+
+        // Check quiz achievmeents
+        const newQuizAchievements =
+          await AchievementService.checkQuizAchievements(userId);
+
+        const allNewAchievements = [
+          ...(newStreakAchievements || []),
+          ...(newQuizAchievements || []),
+        ];
+
+        if (allNewAchievements && allNewAchievements.length > 0) {
+          console.log("FOund new achievements:", allNewAchievements);
           toast.success(
-            `You've earned ${newAchievements.length} new achievement(s)!`
+            `You've earned ${allNewAchievements.length} new achievement(s)!`
           );
-          // Refresh achievements list
           fetchAchievements();
         }
       } catch (error) {
-        console.error("Error checking streak achievements:", error);
+        console.error("Error checking achievements:", error);
       }
     };
 
-    checkForStreakAchievements();
+    checkForAllAchievements();
   }, [userId]);
 
   const mapAchievementsForDisplay = (apiAchievements) => {

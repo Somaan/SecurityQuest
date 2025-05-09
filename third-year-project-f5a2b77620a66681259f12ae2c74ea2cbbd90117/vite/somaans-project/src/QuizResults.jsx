@@ -21,6 +21,7 @@ import { toast } from "react-toastify";
 import { API_ENDPOINTS, QUIZ_CONFIG } from "./constants";
 import OllamaFeedback from "./OllamaFeedback";
 import OllamaService from "./OllamaService";
+import AchievementService from "./AchievementService";
 
 // Helper function to get display name for question types
 export const getQuestionTypeDisplay = (type) => {
@@ -287,6 +288,33 @@ const QuizResults = () => {
           position: "top-center",
           autoClose: 3000,
         });
+
+        const quizResult = {
+          quizId: quizId,
+          score: percentCorrect,
+          totalQuestions: totalQuestions,
+          correctAnswers: correctAnswers,
+          consecutiveCorrect: consecutiveCorrect || 0,
+          percentCorrect: percentCorrect,
+        };
+
+        console.log("Checking for new achievements after quiz completion");
+        try {
+          const newAchievements =
+            await AchievementService.checkAchievementsAfterQuiz(
+              userId,
+              quizResult
+            );
+
+          if (newAchievements && newAchievements.length > 0) {
+            console.log(
+              `Unlocked ${newAchievements.length} new achievements:`,
+              newAchievements
+            );
+          }
+        } catch (achievementError) {
+          console.error("Error checking achievements:", achievementError);
+        }
 
         // Mark as submitted
         setScoreSubmitted(true);

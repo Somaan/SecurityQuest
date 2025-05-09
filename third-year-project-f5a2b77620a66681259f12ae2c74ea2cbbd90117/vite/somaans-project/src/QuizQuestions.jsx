@@ -357,14 +357,8 @@ const QuizQuestions = () => {
 
     // Submit results and then navigate
     submitQuizResults().then(() => {
-      // Check for quiz completion achievements
-      const quizAchievements =
-        AchievementService.checkQuizAchievements(quizResults);
-      quizAchievements.forEach((achievement) => {
-        AchievementService.queueAchievement(achievement);
-      });
-
-      // Navigate to results page
+      // Skip achievement check here - we'll do it in QuizResults
+      // Navigate directly to results page
       navigate("/quiz/results", {
         state: quizResults,
       });

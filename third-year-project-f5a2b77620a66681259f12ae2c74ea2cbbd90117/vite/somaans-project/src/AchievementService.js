@@ -409,24 +409,340 @@ class AchievementService {
     }
   }
   
-  // Check for quiz-related achievements
-  static checkQuizAchievements(quizResults) {
-    const newAchievements = [];
+  // Check for quiz-related achievements - NEW IMPROVED VERSION
+  static async checkQuizAchievements(userId) {
+    try {
+      console.log(`Checking quiz achievements for user ${userId}...`);
+      
+      // Fetch user quiz data
+      const response = await fetch(API_ENDPOINTS.GET_USER_STREAKS.replace(':userId', userId));
+      if (!response.ok) {
+        throw new Error('Failed to fetch user quiz data');
+      }
+      
+      const data = await response.json();
+      const userData = data.userData || {};
+      
+      // Extract quiz data from the response
+      const totalQuizzes = userData.total_quizzes || 0;
+      const beginnerQuizCount = userData.difficulty_counts?.[1] || 0;
+      const intermediateQuizCount = userData.difficulty_counts?.[2] || 0;
+      const advancedQuizCount = userData.difficulty_counts?.[3] || 0;
+      
+      console.log(`Quiz stats: Total: ${totalQuizzes}, Beginner: ${beginnerQuizCount}, Intermediate: ${intermediateQuizCount}, Advanced: ${advancedQuizCount}`);
+      
+      // Check quiz history for perfect score
+      let hasPerfectScore = false;
+      if (data.quizHistory && Array.isArray(data.quizHistory)) {
+        hasPerfectScore = data.quizHistory.some(quiz => quiz.score === 100);
+        if (hasPerfectScore) {
+          console.log("User has achieved a perfect score on a quiz");
+        }
+      }
+      
+      // Prepare array for all quiz achievements
+      const quizAchievements = [];
+      
+      // Quiz Master (10 quizzes)
+      const quizMasterProgress = Math.min(100, (totalQuizzes / 10) * 100);
+      console.log(`Quiz Master progress: ${quizMasterProgress.toFixed(1)}%`);
+      quizAchievements.push({
+        id: 8,
+        title: 'Quiz Master',
+        description: 'Complete 10 quizzes',
+        icon: 'graduation-cap',
+        color: '#3498db',
+        unlocked: totalQuizzes >= 10,
+        progress: quizMasterProgress
+      });
+      
+      // Beginner's Badge (5 beginner quizzes)
+      const beginnerBadgeProgress = Math.min(100, (beginnerQuizCount / 5) * 100);
+      console.log(`Beginner's Badge progress: ${beginnerBadgeProgress.toFixed(1)}%`);
+      quizAchievements.push({
+        id: 9,
+        title: 'Beginner\'s Badge',
+        description: 'Complete 5 Beginner quizzes',
+        icon: 'shield-alt',
+        color: '#2ecc71',
+        unlocked: beginnerQuizCount >= 5,
+        progress: beginnerBadgeProgress
+      });
+      
+      // Intermediate Guardian (5 intermediate quizzes)
+      const intermediateGuardianProgress = Math.min(100, (intermediateQuizCount / 5) * 100);
+      console.log(`Intermediate Guardian progress: ${intermediateGuardianProgress.toFixed(1)}%`);
+      quizAchievements.push({
+        id: 11,
+        title: 'Intermediate Guardian',
+        description: 'Complete 5 Intermediate quizzes',
+        icon: 'shield',
+        color: '#9b59b6',
+        unlocked: intermediateQuizCount >= 5,
+        progress: intermediateGuardianProgress
+      });
+      
+      // Advanced Defender (5 advanced quizzes)
+      const advancedDefenderProgress = Math.min(100, (advancedQuizCount / 5) * 100);
+      console.log(`Advanced Defender progress: ${advancedDefenderProgress.toFixed(1)}%`);
+      quizAchievements.push({
+        id: 12,
+        title: 'Advanced Defender',
+        description: 'Complete 5 Advanced quizzes',
+        icon: 'shield-virus',
+        color: '#e74c3c',
+        unlocked: advancedQuizCount >= 5,
+        progress: advancedDefenderProgress
+      });
+      
+      // Perfect Score
+      quizAchievements.push({
+        id: 13,
+        title: 'Perfect Score',
+        description: 'Get 100% on any quiz',
+        icon: 'award',
+        color: '#f1c40f',
+        unlocked: hasPerfectScore,
+        progress: hasPerfectScore ? 100 : 0
+      });
+      
+      // Save all achievements with progress
+      console.log(`Saving ${quizAchievements.length} quiz achievements`);
+      for (const achievement of quizAchievements) {
+        await this.saveAchievement(userId, achievement);
+      }
+      
+      // Return newly unlocked achievements for notification
+      const newlyUnlocked = quizAchievements.filter(achievement => 
+        achievement.unlocked && 
+        achievement.progress >= 100 && 
+        !this.shownAchievements.has(achievement.id)
+      );
+      
+      console.log(`Found ${newlyUnlocked.length} newly unlocked quiz achievements`);
+      return newlyUnlocked;
+      
+    } catch (error) {
+      console.error('Error checking quiz achievements:', error);
+      return [];
+    }
+  }
+  
+  // Check for achievements after quiz completion - NEW METHOD
+static async checkAchievementsAfterQuiz(userId, quizResult) {
+  try {
+    if (typeof userId === 'object') {
+      console.error('userId is an object instead of string/number:', userId);
+      if (userId.id) {
+        userId = userId.id;
+      } else {
+        userId = sessionStorage.getItem("userId") || "1";
+      }
+    }
     
-    // Check for "Quick Learner" achievement (3 correct answers in a row)
-    if (quizResults && quizResults.consecutiveCorrect >= 3) {
-      newAchievements.push({
-        id: 7, // ID from database
+    userId = String(userId);
+    console.log("Checking achievements after quiz completion:", quizResult);
+    
+    // Check for Quick Learner achievement (3 correct answers in a row)
+    const newAchievements = [];
+    if (quizResult && quizResult.consecutiveCorrect >= 3) {
+      const quickLearner = {
+        id: 7,
         title: 'Quick Learner',
         description: '3 correct answers in a row',
         icon: 'star',
         color: '#F1C40F',
-        unlocked: true
-      });
+        unlocked: true,
+        progress: 100
+      };
+      
+      // Save the achievement
+      try {
+        await this.saveAchievement(userId, quickLearner);
+        
+        // Add to new achievements if not already shown
+        if (!this.shownAchievements.has(quickLearner.id)) {
+          newAchievements.push(quickLearner);
+          this.shownAchievements.add(quickLearner.id);
+          this.saveShownAchievements(userId);
+        }
+      } catch (error) {
+        console.error("Error saving Quick Learner achievement:", error);
+      }
     }
     
+    // Check for Perfect Score achievement immediately
+    if (quizResult && quizResult.percentCorrect === 100) {
+      const perfectScore = {
+        id: 13,
+        title: 'Perfect Score',
+        description: 'Get 100% on any quiz',
+        icon: 'award',
+        color: '#f1c40f',
+        unlocked: true,
+        progress: 100
+      };
+      
+      // Save this achievement
+      try {
+        await this.saveAchievement(userId, perfectScore);
+        
+        // Add to new achievements if not already shown
+        if (!this.shownAchievements.has(perfectScore.id)) {
+          newAchievements.push(perfectScore);
+          this.shownAchievements.add(perfectScore.id);
+          this.saveShownAchievements(userId);
+        }
+      } catch (error) {
+        console.error("Error saving Perfect Score achievement:", error);
+      }
+    }
+    
+    // Check difficulty-specific achievements safely
+    if (quizResult && quizResult.quizId) {
+      try {
+        // Fetch current counts
+        const streakResponse = await fetch(API_ENDPOINTS.GET_USER_STREAKS.replace(':userId', userId));
+        if (streakResponse.ok) {
+          const data = await streakResponse.json();
+          const userData = data.userData || {};
+          
+          // *** UPDATED CODE: Always update progress regardless of completion ***
+          const quizType = parseInt(quizResult.quizId);
+          const totalQuizzes = userData.total_quizzes || 0;
+          
+          // Get counts for this difficulty
+          const beginnerCount = userData.difficulty_counts?.[1] || 0;
+          const intermediateCount = userData.difficulty_counts?.[2] || 0;
+          const advancedCount = userData.difficulty_counts?.[3] || 0;
+          
+          console.log(`Quiz counts - Beginner: ${beginnerCount}, Intermediate: ${intermediateCount}, Advanced: ${advancedCount}, Total: ${totalQuizzes}`);
+          
+          // Always update Beginner's Badge progress
+          if (quizType === 1) {
+            const beginnerBadge = {
+              id: 9,
+              title: 'Beginner\'s Badge',
+              description: 'Complete 5 Beginner quizzes',
+              icon: 'shield-alt',
+              color: '#2ecc71',
+              unlocked: beginnerCount >= 5,
+              progress: Math.min(100, (beginnerCount / 5) * 100)
+            };
+            
+            await this.saveAchievement(userId, beginnerBadge);
+            console.log(`Updated Beginner's Badge progress: ${beginnerBadge.progress}%`);
+            
+            // Add to new achievements if newly unlocked
+            if (beginnerBadge.unlocked && !this.shownAchievements.has(beginnerBadge.id)) {
+              newAchievements.push(beginnerBadge);
+              this.shownAchievements.add(beginnerBadge.id);
+              this.saveShownAchievements(userId);
+            }
+          }
+          
+          // Always update Intermediate Guardian progress
+          if (quizType === 2) {
+            const intermediateGuardian = {
+              id: 11,
+              title: 'Intermediate Guardian',
+              description: 'Complete 5 Intermediate quizzes',
+              icon: 'shield',
+              color: '#9b59b6',
+              unlocked: intermediateCount >= 5,
+              progress: Math.min(100, (intermediateCount / 5) * 100)
+            };
+            
+            await this.saveAchievement(userId, intermediateGuardian);
+            console.log(`Updated Intermediate Guardian progress: ${intermediateGuardian.progress}%`);
+            
+            // Add to new achievements if newly unlocked
+            if (intermediateGuardian.unlocked && !this.shownAchievements.has(intermediateGuardian.id)) {
+              newAchievements.push(intermediateGuardian);
+              this.shownAchievements.add(intermediateGuardian.id);
+              this.saveShownAchievements(userId);
+            }
+          }
+          
+          // Always update Advanced Defender progress
+          if (quizType === 3) {
+            const advancedDefender = {
+              id: 12,
+              title: 'Advanced Defender',
+              description: 'Complete 5 Advanced quizzes',
+              icon: 'shield-virus',
+              color: '#e74c3c',
+              unlocked: advancedCount >= 5,
+              progress: Math.min(100, (advancedCount / 5) * 100)
+            };
+            
+            await this.saveAchievement(userId, advancedDefender);
+            console.log(`Updated Advanced Defender progress: ${advancedDefender.progress}%`);
+            
+            // Add to new achievements if newly unlocked
+            if (advancedDefender.unlocked && !this.shownAchievements.has(advancedDefender.id)) {
+              newAchievements.push(advancedDefender);
+              this.shownAchievements.add(advancedDefender.id);
+              this.saveShownAchievements(userId);
+            }
+          }
+          
+          // Always update Quiz Master progress
+          const quizMasterProgress = Math.min(100, (totalQuizzes / 10) * 100);
+          const quizMaster = {
+            id: 8,
+            title: 'Quiz Master',
+            description: 'Complete 10 quizzes',
+            icon: 'graduation-cap',
+            color: '#3498db',
+            unlocked: totalQuizzes >= 10,
+            progress: quizMasterProgress
+          };
+          
+          await this.saveAchievement(userId, quizMaster);
+          console.log(`Updated Quiz Master progress: ${quizMasterProgress}%`);
+          
+          // Add to new achievements if newly unlocked
+          if (quizMaster.unlocked && !this.shownAchievements.has(quizMaster.id)) {
+            newAchievements.push(quizMaster);
+            this.shownAchievements.add(quizMaster.id);
+            this.saveShownAchievements(userId);
+          }
+          
+          // Update Rising Star progress (Complete 5 quizzes with score >= 70%)
+          if (quizResult && quizResult.percentCorrect >= 70) {
+            // We would need to track this separately, for now, just update if the current quiz qualifies
+            const risingStar = {
+              id: 10,
+              title: 'Rising Star',
+              description: 'Complete 5 quizzes with a score of 70% or higher',
+              icon: 'star',
+              color: '#f39c12',
+              // This would need proper tracking of high-scoring quizzes
+              unlocked: false,
+              progress: Math.min(20, quizMasterProgress) // Simplified progress based on total quizzes for now
+            };
+            
+            await this.saveAchievement(userId, risingStar);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking difficulty achievements:", error);
+      }
+    }
+    
+    // Queue achievements for notification
+    for (const achievement of newAchievements) {
+      this.queueAchievement(achievement);
+    }
+    
+    // Return all newly unlocked achievements
     return newAchievements;
+  } catch (error) {
+    console.error("Error checking achievements after quiz:", error);
+    return [];
   }
+}
   
   // Check for leaderboard position achievements
   static async checkLeaderboardAchievements(userId) {
