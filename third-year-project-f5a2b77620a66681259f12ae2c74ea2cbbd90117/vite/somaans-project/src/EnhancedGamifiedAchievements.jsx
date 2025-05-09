@@ -157,31 +157,31 @@ const EnhancedGamifiedAchievements = ({ achievements }) => {
       : 0;
 
   // Filter achievements by category, status and search term
-  const filteredAchievements = safeAchievements.filter((achievement) => {
-    // Category filter
-    const categoryMatch =
-      activeCategory === "all" ||
-      (achievement && achievement.category === activeCategory);
+  // Fix for the filteredAchievements function - replace the current one with this:
 
-    // Status filter
+  // Filter achievements by category, status and search term
+  const filteredAchievements = safeAchievements.filter((achievement) => {
+    if (!achievement) return false; // Skip null/undefined achievements
+
+    // Category filtering
+    const categoryMatch =
+      activeCategory === "all" || achievement.category === activeCategory;
+
+    // Status filtering
     let statusMatch = true;
     if (activeStatus === "unlocked") {
-      statusMatch = achievement && achievement.unlocked;
+      statusMatch = achievement.unlocked === true;
     } else if (activeStatus === "locked") {
-      statusMatch = achievement && !achievement.unlocked;
+      statusMatch = achievement.unlocked === false && achievement.progress <= 0;
     } else if (activeStatus === "progress") {
-      statusMatch =
-        achievement && !achievement.unlocked && achievement.progress > 0;
+      statusMatch = achievement.unlocked === false && achievement.progress > 0;
     }
 
     // Search term filter
     const searchMatch =
       !searchTerm ||
-      (achievement &&
-        (achievement.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          achievement.description
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())));
+      achievement.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      achievement.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
     return categoryMatch && statusMatch && searchMatch;
   });

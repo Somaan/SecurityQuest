@@ -8,7 +8,6 @@ import { API_ENDPOINTS } from "./constants";
 import { toast } from "react-toastify";
 import EnhancedGamifiedAchievements from "./EnhancedGamifiedAchievements";
 import AchievementService from "./AchievementService";
-import StreakDebugger from "./StreakDebugger";
 
 const Achievements = () => {
   const [achievements, setAchievements] = useState([]);
@@ -134,7 +133,6 @@ const Achievements = () => {
     checkForStreakAchievements();
   }, [userId]);
 
-  // Function to map API achievements to the format expected by EnhancedGamifiedAchievements
   const mapAchievementsForDisplay = (apiAchievements) => {
     // Make sure we're dealing with an array
     if (!Array.isArray(apiAchievements)) {
@@ -197,45 +195,105 @@ const Achievements = () => {
       // Define rarity based on some logic
       let rarity = "common";
       let tier = 1;
+
+      // Determine category based on achievement_type or title
       let category = "other";
 
-      // Example logic for determining rarity and tier based on title
-      if (title) {
-        // Set category based on title keywords
+      // Set category based on achievement_type if available
+      if (achievement.achievement_type) {
+        switch (achievement.achievement_type) {
+          case "login_streak":
+            category = "login";
+            break;
+          case "quiz_streak":
+          case "quiz_performance":
+            category = "quiz";
+            break;
+          case "threat_identification":
+            category = "quiz";
+            break;
+          case "login_count":
+            category = "login";
+            break;
+          default:
+            category = "other";
+        }
+      }
+      // Fallback to title-based categorization if achievement_type is not available
+      else if (title) {
         if (
           title.includes("Login") ||
           title.includes("User") ||
-          title.includes("Weekly") ||
-          title.includes("Monthly") ||
           title.includes("Dedicated")
         ) {
           category = "login";
-        } else if (title.includes("Quiz")) {
+        } else if (
+          title.includes("Quiz") ||
+          title.includes("Beginner") ||
+          title.includes("Intermediate") ||
+          title.includes("Advanced") ||
+          title.includes("Email") ||
+          title.includes("Score")
+        ) {
           category = "quiz";
-        } else if (title.includes("Streak")) {
+        } else if (
+          title.includes("Weekly") ||
+          title.includes("Monthly") ||
+          title.includes("Streak")
+        ) {
           category = "streaks";
-        } else if (title.includes("Score") || title.includes("Perfect")) {
+        } else if (
+          title.includes("Perfect") ||
+          title.includes("Champion") ||
+          title.includes("Expert")
+        ) {
           category = "scores";
         }
+      }
 
-        // Set rarity and tier based on title keywords
-        if (title === "Security Expert") {
-          rarity = "legendary";
-          tier = 4;
-        } else if (title === "Security Champion") {
-          rarity = "epic";
-          tier = 3;
-        } else if (title === "Monthly Master" || title === "Quiz Champion") {
-          rarity = "rare";
-          tier = 3;
-        } else if (
-          title === "Weekly Warrior" ||
-          title === "Quiz Enthusiast" ||
-          title === "Rising Star"
-        ) {
-          rarity = "uncommon";
-          tier = 2;
-        }
+      // Special handling: Set 'streaks' category for specific streak achievements
+      const streakRelated =
+        title.includes("Streak") ||
+        title.includes("Weekly Warrior") ||
+        title.includes("Monthly Master") ||
+        title.includes("days in a row");
+
+      if (streakRelated) {
+        category = "streaks";
+      }
+
+      // For achievements about scores, set to scores category
+      if (
+        title.includes("Score") ||
+        title.includes("Perfect") ||
+        title.includes("Expert") ||
+        title.includes("Champion")
+      ) {
+        category = "scores";
+      }
+
+      // Set rarity and tier based on title keywords
+      if (title === "Security Expert" || title === "Monthly Master") {
+        rarity = "legendary";
+        tier = 4;
+      } else if (title === "Security Champion" || title === "Perfect Score") {
+        rarity = "epic";
+        tier = 3;
+      } else if (
+        title === "Quiz Champion" ||
+        title === "Email Vigilance" ||
+        title === "Advanced Defender"
+      ) {
+        rarity = "rare";
+        tier = 3;
+      } else if (
+        title === "Weekly Warrior" ||
+        title === "Quiz Enthusiast" ||
+        title === "Intermediate Guardian" ||
+        title === "Beginner's Badge"
+      ) {
+        rarity = "uncommon";
+        tier = 2;
       }
 
       // Format unlockDate properly if it exists
@@ -253,6 +311,7 @@ const Achievements = () => {
         title,
         description,
         category,
+        streakRelated,
         icon: iconStr,
         color: colorStr,
         unlocked,
@@ -310,9 +369,6 @@ const Achievements = () => {
 
         {/* Use the enhanced achievements component */}
         <EnhancedGamifiedAchievements achievements={achievements} />
-
-        {/* Add the debug tool */}
-        <StreakDebugger userId={userId} />
       </div>
 
       <style jsx>{`
