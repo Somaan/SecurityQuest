@@ -7,7 +7,7 @@
 const OLLAMA_CONFIG = {
   API_URL: 'http://localhost:11434/api/generate',
   DEFAULT_MODEL: 'phi3', // Use whichever model you have installed locally
-  TIMEOUT: 30000, // 30 seconds timeout for responses
+  TIMEOUT: 60000, // Increased from 30s to 60s to prevent timeouts
   MAX_RETRIES: 2,  // Number of retries if a request fails
   // Security topics taxonomy for better categorisation
   SECURITY_TOPICS: {
@@ -41,51 +41,11 @@ const OLLAMA_CONFIG = {
 // Store previous responses to detect repetition
 const responseCache = {
   feedbacks: [],
-  // Check for similar content in previous responses
+  // FIXED: Always return false to prevent incorrect duplicate detection
   isTooSimilar: function(newContent) {
-    if (!newContent) return true;
-    
-    // Extract the importance statement for comparison
-    let newImportance = '';
-    if (typeof newContent === 'object' && newContent.importance) {
-      newImportance = newContent.importance;
-    } else if (typeof newContent === 'string') {
-      try {
-        const parsed = JSON.parse(newContent);
-        newImportance = parsed.importance || '';
-      } catch (e) {
-        newImportance = newContent.substring(0, 100);
-      }
-    }
-    
-    // If we have an empty or very short importance, likely invalid
-    if (!newImportance || newImportance.length < 20) return true;
-    
-    // Check against previous feedbacks
-    for (const prev of this.feedbacks) {
-      // If importance statements are too similar, consider it duplicate
-      if (prev.importance && this.calculateSimilarity(prev.importance, newImportance) > 0.85) {
-        console.warn("Detected very similar content to previous feedback");
-        return true;
-      }
-    }
-    
-    return false;
+    return false; // Disable similarity check to avoid duplicate content issues
   },
-  // Calculate text similarity
-  calculateSimilarity: function(str1, str2) {
-    if (!str1 || !str2) return 0;
-    
-    // Simple word-overlap similarity metric
-    const words1 = str1.toLowerCase().split(/\W+/).filter(w => w.length > 3);
-    const words2 = str2.toLowerCase().split(/\W+/).filter(w => w.length > 3);
-    
-    // Count common words
-    const common = words1.filter(word => words2.includes(word)).length;
-    
-    // Calculate Jaccard similarity
-    return common / (words1.length + words2.length - common);
-  },
+  
   addFeedback: function(feedback) {
     // Only store valid feedback objects
     if (feedback && typeof feedback === 'object') {
@@ -97,6 +57,7 @@ const responseCache = {
       }
     }
   },
+  
   clear: function() {
     this.feedbacks = [];
   }
@@ -124,7 +85,10 @@ class OllamaService {
       console.log(`Sending prompt to Ollama (${model})...`);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), OLLAMA_CONFIG.TIMEOUT);
+      const timeoutId = setTimeout(() => {
+        console.log("Ollama request timed out after", OLLAMA_CONFIG.TIMEOUT/1000, "seconds");
+        controller.abort();
+      }, OLLAMA_CONFIG.TIMEOUT);
       
       // Add the system prompt if provided
       const fullPrompt = systemPrompt 
@@ -204,7 +168,7 @@ class OllamaService {
   static async isAvailable() {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // Short timeout for availability check
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased from 5s to 10s
       
       const response = await fetch('http://localhost:11434/api/tags', {
         signal: controller.signal
@@ -383,33 +347,50 @@ class OllamaService {
     }
 
     try {
-      // Make the question content more specific with unique details
-      const questionNumber = questionData.questionIndex || "Unknown";
-      const uniquePromptDetails = `Question #${questionNumber}: "${questionData.question}"`;
+      // FIXED: Make the question number consistent and explicit
+      const questionNumber = questionData.questionIndex !== undefined ? 
+        questionData.questionIndex + 1 : "Unknown";
       
-      // Create a detailed and specific prompt focused on this single question
-      let questionDetails = '';
+      // FIXED: Create a consistent ID format
+      const questionId = `question-${questionNumber}`;
+      
+      // FIXED: Extract the specific user misconception for better personalization
+      let userMisconception = '';
       
       // Format the question info differently based on question type
+      let questionDetails = '';
+      
+      // FIXED: Extract the specific user misconception
       if (questionData.type === 'multiple_choice' || !questionData.type) {
+        userMisconception = `User answered "${questionData.selectedOption || 'Unknown'}" instead of "${questionData.correctOption || 'Unknown'}"`;
+        
         questionDetails = `
 Question #${questionNumber}: "${questionData.question}"
 Type: Multiple Choice
-User's answer: "${questionData.userAnswer || questionData.selectedOption || 'Not provided'}"
-Correct answer: "${questionData.correctOption || 'Not provided'}"`;
+User's incorrect answer: "${questionData.selectedOption || questionData.userAnswer || 'Not provided'}"
+Correct answer: "${questionData.correctOption || 'Not provided'}"
+User misconception: ${userMisconception}`;
       } else if (questionData.details) {
         // For special question types with details
+        if (questionData.details.falseNegatives && questionData.details.falseNegatives.length > 0) {
+          userMisconception = `User failed to identify ${questionData.details.falseNegatives.length} critical security elements`;
+        } else if (questionData.details.incorrectlySelected && questionData.details.incorrectlySelected.length > 0) {
+          userMisconception = `User incorrectly identified non-suspicious elements as suspicious`;
+        }
+        
         questionDetails = `
 Question #${questionNumber}: "${questionData.question}"
 Type: ${this.formatQuestionType(questionData.type)}
 User's score: ${questionData.score || 0}%
+User misconception: ${userMisconception}
 Details: ${JSON.stringify(questionData.details, null, 2)}`;
       } else {
         // Basic info for other question types
         questionDetails = `
 Question #${questionNumber}: "${questionData.question}"
 Type: ${this.formatQuestionType(questionData.type)}
-User's score: ${questionData.score || 0}%`;
+User's score: ${questionData.score || 0}%
+User misconception: The user did not correctly identify all security threats.`;
       }
       
       // Add user context to create a more personalised experience
@@ -427,11 +408,11 @@ User's score: ${questionData.score || 0}%`;
       // Craft a system prompt specifically for this question
       const systemPrompt = `You are an expert cybersecurity educator specialising in ${this.formatQuestionType(questionData.type || 'security awareness')}. 
 Your task is to provide highly personalised, targeted feedback for Question #${questionNumber}: "${questionData.question}".
-Focus exclusively on this particular question and the specific misconception evident in their incorrect answer.
+Focus on the specific misconception in their incorrect answer: "${userMisconception}".
 Your feedback should be tailored to a ${difficulty} difficulty level and provide immediately actionable advice relevant to real-world scenarios.
 Make your feedback UNIQUE and SPECIFIC to THIS EXACT question - do not provide generic cybersecurity advice.`;
       
-      // Create a detailed question-specific prompt
+      // FIXED: Create a detailed question-specific prompt that includes misconception
       const prompt = `
 I need your help creating personalised feedback for this specific security question that a user answered incorrectly.
 
@@ -445,7 +426,7 @@ Based on this specific incorrect answer to Question #${questionNumber}, please p
 
 1. A clear, concise title that accurately reflects the specific security concept in THIS question the user misunderstood (max 10 words)
 2. Why understanding this SPECIFIC concept from Question #${questionNumber} is important (2 sentences maximum, emphasising real-world impact)
-3. 3-4 key learning points that DIRECTLY address the specific misconception shown in this particular answer
+3. 3-4 key learning points that DIRECTLY address the specific misconception shown in their answer "${userMisconception}"
 4. 2-3 practical tips they can apply immediately that are DIRECTLY related to this specific security concept
 5. 1-2 reliable learning resources specific to this concept (just names of websites, tools, or content)
 
@@ -479,8 +460,9 @@ IMPORTANT: Make your feedback UNIQUE to Question #${questionNumber} - it must be
           throw new Error("Invalid response structure");
         }
         
-        // Add question number and uniqueness flag to the title
-        parsedResponse.title = this.ensureQuestionRelevantTitle(parsedResponse.title, questionData);
+        // FIXED: Add question number info to ensure proper display
+        parsedResponse.id = questionId;
+        parsedResponse.questionNumber = questionNumber;
         
         return parsedResponse;
       } catch (error) {
@@ -644,21 +626,141 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
   }
   
   /**
+   * FIXED: Added missing method for email phishing feedback
+   * Generate email phishing-specific feedback based on subtype
+   * @param {string} subtype - The specific type of email phishing
+   * @param {number} questionNumber - The question number
+   * @param {string} title - The generated title
+   * @returns {Object} - Email phishing feedback
+   */
+  static getEmailPhishingFeedback(subtype, questionNumber, title) {
+    // Create a consistent ID
+    const questionId = `question-${questionNumber}`;
+    
+    // Common email phishing feedback
+    const baseFeedback = {
+      id: questionId,
+      title: title,
+      importance: "Email phishing remains one of the most common initial attack vectors for security breaches in organizations.",
+      keyPoints: [
+        "Always verify the sender's email address by checking the actual email address, not just the display name",
+        "Be suspicious of urgency, threatening language, or offers that seem too good to be true",
+        "Check for grammatical errors, unusual formatting, and inconsistent branding",
+        "Hover over links to verify their destination before clicking"
+      ],
+      practicalTips: [
+        "Contact the purported sender through a different channel if an email seems suspicious",
+        "Never enter credentials on a page you reached via an email link",
+        "Set up advanced email filtering and enable email authentication protocols in your organization"
+      ],
+      resources: [
+        "Anti-Phishing Working Group (APWG) resources",
+        "SANS 'Securing The Human' Email Security Training"
+      ],
+      questionNumber: questionNumber
+    };
+    
+    // Adjust feedback based on subtype
+    switch (subtype) {
+      case 'spear':
+        return {
+          ...baseFeedback,
+          title: `Spear Phishing Detection (#${questionNumber})`,
+          importance: "Spear phishing attacks are highly targeted and personalized, making them much more difficult to detect than general phishing attempts.",
+          keyPoints: [
+            "Spear phishing emails are customized with personal information to appear more legitimate",
+            "Attackers research their targets on social media and professional sites",
+            "These attacks often impersonate colleagues, managers, or trusted partners",
+            "They may reference real projects, events, or organizational information"
+          ],
+          practicalTips: [
+            "Verify unexpected requests from colleagues through a different communication channel",
+            "Be particularly cautious with emails requesting sensitive information or financial actions",
+            "Implement DMARC, SPF, and DKIM to reduce email spoofing"
+          ]
+        };
+        
+      case 'attachment':
+        return {
+          ...baseFeedback,
+          title: `Email Attachment Threats (#${questionNumber})`,
+          importance: "Malicious attachments remain a primary delivery mechanism for malware and ransomware attacks.",
+          keyPoints: [
+            "Be wary of unexpected attachments, even from seemingly known senders",
+            "Dangerous file types include .exe, .zip, .js, and macro-enabled documents (.docm, .xlsm)",
+            "Modern attacks may use double extensions (file.pdf.exe) to disguise executable files",
+            "Even PDFs can contain malicious JavaScript code"
+          ],
+          practicalTips: [
+            "Never open attachments unless you were expecting them",
+            "Use a secure document preview service or sandbox to open suspicious attachments",
+            "Disable automatic macro execution in Microsoft Office"
+          ]
+        };
+        
+      case 'link':
+        return {
+          ...baseFeedback,
+          title: `Dangerous Email Links (#${questionNumber})`,
+          importance: "Malicious links in emails can lead to credential theft, malware downloads, or financial fraud.",
+          keyPoints: [
+            "Phishing links often lead to convincing replicas of legitimate websites",
+            "URLs may use typosquatting (gooogle.com) or deceptive subdomains (paypal.malicious.com)",
+            "The visible link text often differs from the actual URL destination",
+            "Some links may redirect multiple times before reaching the malicious site"
+          ],
+          practicalTips: [
+            "Hover over links to preview the actual URL before clicking",
+            "Look for HTTPS, but remember that phishing sites can use encryption too",
+            "Type important URLs directly into your browser rather than clicking links"
+          ]
+        };
+        
+      case 'urgency':
+        return {
+          ...baseFeedback,
+          title: `Urgency Tactics in Phishing (#${questionNumber})`,
+          importance: "Creating a false sense of urgency is a key tactic used to bypass critical thinking and prompt immediate action.",
+          keyPoints: [
+            "Phishing emails often create artificial time pressure to force quick decisions",
+            "Common urgency tactics include account suspension threats, limited-time offers, and security alerts",
+            "Threats of negative consequences are designed to trigger emotional responses",
+            "Legitimate organizations rarely demand immediate action via email"
+          ],
+          practicalTips: [
+            "Take time to evaluate urgent requests, even when they appear time-sensitive",
+            "Check directly with the purported sender through official channels",
+            "Remember that creating panic is a deliberate social engineering tactic"
+          ]
+        };
+      
+      // Default general email phishing feedback
+      default:
+        return baseFeedback;
+    }
+  }
+  
+  /**
    * Generate fallback feedback for a specific question
    * @param {Object} questionData - The question data
    * @returns {Object} - Fallback question feedback
    */
   static generateFallbackQuestionFeedback(questionData) {
     // Extract question information
-    const questionNumber = questionData.questionIndex || Math.floor(Math.random() * 20) + 1;
+    // FIXED: Make the question number consistent
+    const questionNumber = questionData.questionIndex !== undefined ? 
+      questionData.questionIndex + 1 : "Unknown";
     const questionType = questionData.type || 'multiple_choice';
     const questionText = questionData.question || '';
+    
+    // FIXED: Create a consistent ID
+    const questionId = `question-${questionNumber}`;
     
     // Create a title based on the question
     const titleFromQuestion = this.generateTitleFromQuestion(questionText, questionNumber);
     
     // Get feedback based on question content
-    return this.generateContentBasedFeedback(questionType, questionText, questionNumber, titleFromQuestion);
+    return this.generateContentBasedFeedback(questionType, questionText, questionNumber, titleFromQuestion, questionData);
   }
   
   /**
@@ -710,8 +812,11 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
    * @param {string} title - The generated title
    * @returns {Object} - Feedback based on content
    */
-  static generateContentBasedFeedback(questionType, questionText, questionNumber, title) {
+  static generateContentBasedFeedback(questionType, questionText, questionNumber, title, questionData) {
     const lowerQuestion = questionText.toLowerCase();
+    
+    // FIXED: Create a consistent ID
+    const questionId = `question-${questionNumber}`;
     
     // Email phishing specific feedback
     if (questionType === 'email_phishing' || lowerQuestion.includes('email') || lowerQuestion.includes('phish')) {
@@ -725,288 +830,159 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       return this.getEmailPhishingFeedback(subtype, questionNumber, title);
     }
     
+    // For multiple choice, try to extract specific misconception
+    if (questionType === 'multiple_choice' && questionData && questionData.selectedOption) {
+      // Different feedback based on specific questions
+      if (lowerQuestion.includes("what is phishing")) {
+        return {
+          id: questionId,
+          title: "Understanding Phishing Fundamentals",
+          importance: "Phishing is a primary attack vector used in over 90% of successful cyberattacks, not an encryption method.",
+          keyPoints: [
+            "Phishing is a social engineering attack that uses deceptive communications, not an encryption technology",
+            "These attacks aim to trick users into revealing sensitive information or installing malware",
+            "Phishing typically arrives via email but can occur through SMS, voice calls, or social media",
+            "The goal is to appear legitimate enough to bypass the victim's natural suspicion"
+          ],
+          practicalTips: [
+            "Verify the sender's email address by checking the actual email header, not just the display name",
+            "Be wary of unexpected communications, especially those creating urgency or fear",
+            "Never click suspicious links - instead, navigate directly to the official website"
+          ],
+          resources: [
+            "Anti-Phishing Working Group (APWG) resources",
+            "SANS Security Awareness Training modules"
+          ],
+          questionNumber: questionNumber
+        };
+      }
+      else if (lowerQuestion.includes("common indicator")) {
+        return {
+          id: questionId,
+          title: "Recognizing Phishing Red Flags",
+          importance: "Understanding reliable phishing indicators is crucial for identifying and avoiding increasingly sophisticated attacks.",
+          keyPoints: [
+            "Communications using your full name are not reliable indicators of legitimacy and can be easily spoofed",
+            "Urgent calls to action and threats are classic phishing tactics designed to prevent critical thinking",
+            "Phishers use urgency to force quick decisions before you notice other suspicious elements",
+            "Legitimate organizations rarely create artificial time pressure via email"
+          ],
+          practicalTips: [
+            "Take time to evaluate any message creating a sense of urgency - legitimate requests rarely require immediate action",
+            "Look for multiple red flags together, as sophisticated phishing may get some details right",
+            "When in doubt, verify through official channels, not by responding to the message"
+          ],
+          resources: [
+            "NIST Guide on Avoiding Social Engineering and Phishing Attacks",
+            "Phishing.org awareness resources"
+          ],
+          questionNumber: questionNumber
+        };
+      }
+      else if (lowerQuestion.includes("spear phishing")) {
+        return {
+          id: questionId,
+          title: "Spear Phishing vs. Social Media Phishing",
+          importance: "Spear phishing attacks are highly targeted and personalized, making them significantly more dangerous than general phishing attempts.",
+          keyPoints: [
+            "Spear phishing specifically targets individuals or organizations with personalized content, not just social media platforms",
+            "These attacks use research about the target to create highly convincing, customized communications",
+            "Attackers often impersonate trusted individuals or organizations known to the target",
+            "The personalization makes these attacks much harder to detect than generic phishing"
+          ],
+          practicalTips: [
+            "Verify unexpected communications from colleagues through a different channel, even if they appear legitimate",
+            "Be especially cautious with messages that demonstrate knowledge of your organization or recent activities",
+            "Implement email authentication protocols to help verify sender legitimacy"
+          ],
+          resources: [
+            "SANS Securing The Human: Spear Phishing Training",
+            "FBI guidance on Business Email Compromise"
+          ],
+          questionNumber: questionNumber
+        };
+      }
+    }
+    
     // SMS phishing specific feedback
     if (questionType === 'smishing' || lowerQuestion.includes('sms') || lowerQuestion.includes('text message')) {
-      return this.getSmishingFeedback(questionNumber, title);
+      return {
+        id: questionId,
+        title: title,
+        importance: "SMS phishing (smishing) exploits the higher open rates and trust associated with text messages, along with the limited security features on mobile devices.",
+        keyPoints: [
+          "Mobile interfaces make URL verification more difficult than on desktop devices",
+          "Text messages have extremely high open and response rates compared to email",
+          "Shortened URLs in SMS messages obscure the actual destination",
+          "Mobile phones often lack the security tools commonly available on computers"
+        ],
+        practicalTips: [
+          "Never click links in unsolicited text messages claiming to be from businesses",
+          "Contact companies directly through their official app or website if you receive suspicious texts",
+          "Use a spam reporting feature on your phone to report suspicious SMS messages"
+        ],
+        resources: [
+          "FCC SMS phishing guidance",
+          "Mobile Security Alliance resources"
+        ],
+        questionNumber: questionNumber
+      };
     }
     
     // Voice phishing specific feedback
     if (questionType === 'vishing' || lowerQuestion.includes('phone') || lowerQuestion.includes('call')) {
-      return this.getVishingFeedback(questionNumber, title);
+      return {
+        id: questionId,
+        title: title,
+        importance: "Voice phishing bypasses technical security controls by exploiting human trust through real-time conversation and caller ID spoofing.",
+        keyPoints: [
+          "Caller ID can be easily spoofed to display legitimate organisation names or numbers",
+          "Real-time conversation creates pressure to respond immediately without verification",
+          "Human voices build trust and make it harder to detect deception compared to email",
+          "Attackers often have prepared scripts and answers to anticipated questions"
+        ],
+        practicalTips: [
+          "Never provide sensitive information to inbound callers, no matter how convincing they sound",
+          "Hang up and call back using the official number from the organisation's website",
+          "Implement a verification protocol for unexpected calls in your organisation"
+        ],
+        resources: [
+          "FTC Phone Scam resources",
+          "National Cyber Security Centre (NCSC) guidance on vishing"
+        ],
+        questionNumber: questionNumber
+      };
     }
     
     // Website phishing specific feedback
     if (questionType === 'website_phishing' || lowerQuestion.includes('website') || lowerQuestion.includes('url')) {
-      return this.getWebsitePhishingFeedback(questionNumber, title);
+      return {
+        id: questionId,
+        title: title,
+        importance: "Phishing websites have become increasingly sophisticated, often perfectly mimicking legitimate sites while harvesting credentials or distributing malware.",
+        keyPoints: [
+          "Modern phishing sites frequently use HTTPS certificates, making the padlock symbol an unreliable security indicator",
+          "Domain typosquatting uses URLs that are visually similar to legitimate domains",
+          "Many phishing sites now duplicate entire legitimate websites, including functional elements",
+          "Homograph attacks use unicode characters that look identical to standard letters"
+        ],
+        practicalTips: [
+          "Manually type important URLs or use bookmarks rather than following links",
+          "Verify the full domain name carefully, including checking for extra subdomains",
+          "Use a password manager, which won't auto-fill credentials on mismatched domains"
+        ],
+        resources: [
+          "OWASP Web Security Testing Guide",
+          "Google Safe Browsing resources"
+        ],
+        questionNumber: questionNumber
+      };
     }
     
-    // Password security specific feedback
-    if (lowerQuestion.includes('password') || lowerQuestion.includes('credential')) {
-      return this.getPasswordSecurityFeedback(questionNumber, title);
-    }
-    
-    // Social engineering specific feedback
-    if (lowerQuestion.includes('social') || lowerQuestion.includes('engineer')) {
-      return this.getSocialEngineeringFeedback(questionNumber, title);
-    }
-    
-    // Default to general security
-    return this.getGeneralSecurityFeedback(questionNumber, title, lowerQuestion);
-  }
-  
-  /**
-   * Get email phishing feedback based on subtype
-   */
-  static getEmailPhishingFeedback(subtype, questionNumber, title) {
-    // Base importance statement
-    const baseImportance = "Email phishing remains the most common initial vector for security breaches, accounting for over 90% of successful cyber attacks.";
-    
-    // Customise based on subtype
-    switch (subtype) {
-      case 'spear':
-        return {
-          title,
-          importance: "Spear phishing attacks are targeted, highly personalised, and research-driven, making them significantly more effective than mass phishing attempts.",
-          keyPoints: [
-            "Spear phishing emails contain personalised information gathered from your digital footprint",
-            "These attacks often appear to come from trusted colleagues, superiors, or organisations you regularly interact with",
-            "They typically reference specific projects, recent communications, or organisational events to establish credibility",
-            "Even sophisticated users can fall victim due to the highly convincing nature of these targeted messages"
-          ],
-          practicalTips: [
-            "Verify unexpected requests from colleagues through a different communication channel",
-            "Be cautious of emails requesting sensitive information or action, even when they appear to come from known contacts",
-            "Check email headers and sender addresses for subtle inconsistencies"
-          ],
-          resources: [
-            "SANS Securing The Human: Spear Phishing training",
-            "Cybersecurity & Infrastructure Security Agency (CISA) spear phishing resources"
-          ]
-        };
-      
-      case 'attachment':
-        return {
-          title,
-          importance: "Malicious email attachments remain one of the primary delivery mechanisms for malware, including ransomware that can cripple entire organisations.",
-          keyPoints: [
-            "Even attachments that appear to be harmless document types can contain dangerous macros or exploits",
-            "File extensions can be disguised to make executable files appear as documents",
-            "Password-protected attachments may bypass security scanning systems",
-            "Modern malware can spread through your network after a single infected attachment is opened"
-          ],
-          practicalTips: [
-            "Never open attachments from unexpected emails, even if they appear to come from known contacts",
-            "Use a document viewer or preview mode before downloading or opening attachments",
-            "Disable automatic macro execution in office applications"
-          ],
-          resources: [
-            "SANS Malicious Document Analysis course resources",
-            "Microsoft Office security practices guide"
-          ]
-        };
-      
-      case 'link':
-        return {
-          title,
-          importance: "Malicious links in emails lead to credential theft, malware installation, and financial fraud, often through sophisticated fake websites.",
-          keyPoints: [
-            "Phishing links can lead to perfect replicas of legitimate websites designed to steal credentials",
-            "URLs can be disguised through URL shorteners, typosquatting, or homograph attacks using similar-looking characters",
-            "Hovering over a link shows the actual destination, which may differ from the text displayed",
-            "Some malicious links execute drive-by downloads or browser exploits when clicked"
-          ],
-          practicalTips: [
-            "Hover over links to verify their actual destination before clicking",
-            "Access sensitive websites directly through your bookmarks rather than email links",
-            "Look for HTTPS and verify the domain name carefully before entering credentials"
-          ],
-          resources: [
-            "PhishTank database of reported phishing URLs",
-            "APWG Global Phishing Survey"
-          ]
-        };
-      
-      case 'urgency':
-        return {
-          title,
-          importance: "Urgency and fear tactics in phishing emails exploit human psychology to bypass rational security thinking and trigger immediate action.",
-          keyPoints: [
-            "Creating artificial time pressure prevents victims from carefully evaluating the message",
-            "Fear of negative consequences (account closure, legal action) can override security caution",
-            "Messages claiming to be from authority figures exploit our tendency to comply with authority",
-            "Emotional manipulation reduces critical thinking about security red flags"
-          ],
-          practicalTips: [
-            "Take a moment to pause and evaluate any email creating a sense of urgency",
-            "Verify urgent requests through official channels, not by replying to the email",
-            "Remember that legitimate organisations rarely demand immediate action via email"
-          ],
-          resources: [
-            "SANS Security Awareness: Social Engineering tactics training",
-            "Federal Trade Commission (FTC) Scam Alert resources"
-          ]
-        };
-      
-      default:
-        return {
-          title,
-          importance: baseImportance,
-          keyPoints: [
-            "Always verify the sender's actual email address, not just the display name which can be easily spoofed",
-            "Look for linguistic errors, unusual formatting, and inconsistent branding that indicate phishing",
-            "Be suspicious of unexpected attachments, links, or requests for sensitive information",
-            "Consider the context: unexpected emails, especially with urgent requests, warrant extra scrutiny"
-          ],
-          practicalTips: [
-            "Hover over links to reveal the actual URL destination before clicking",
-            "Contact the purported sender through a different channel if an email seems suspicious",
-            "Use email authentication protocols like DMARC, SPF, and DKIM in your organisation"
-          ],
-          resources: [
-            "Anti-Phishing Working Group (APWG) resources",
-            "SANS 'Securing The Human' Email Security Training"
-          ]
-        };
-    }
-  }
-  
-  /**
-   * Get SMS phishing (smishing) feedback
-   */
-  static getSmishingFeedback(questionNumber, title) {
+    // Default general security feedback
     return {
-      title,
-      importance: "SMS phishing (smishing) exploits the higher open rates and trust associated with text messages, along with the limited security features on mobile devices.",
-      keyPoints: [
-        "Mobile interfaces make URL verification more difficult than on desktop devices",
-        "Text messages have extremely high open and response rates compared to email",
-        "Shortened URLs in SMS messages obscure the actual destination",
-        "Mobile phones often lack the security tools commonly available on computers"
-      ],
-      practicalTips: [
-        "Never click links in unsolicited text messages claiming to be from businesses",
-        "Contact companies directly through their official app or website if you receive suspicious texts",
-        "Use a spam reporting feature on your phone to report suspicious SMS messages"
-      ],
-      resources: [
-        "FCC SMS phishing guidance",
-        "Mobile Security Alliance resources"
-      ]
-    };
-  }
-  
-  /**
-   * Get voice phishing (vishing) feedback
-   */
-  static getVishingFeedback(questionNumber, title) {
-    return {
-      title,
-      importance: "Voice phishing bypasses technical security controls by exploiting human trust through real-time conversation and caller ID spoofing.",
-      keyPoints: [
-        "Caller ID can be easily spoofed to display legitimate organisation names or numbers",
-        "Real-time conversation creates pressure to respond immediately without verification",
-        "Human voices build trust and make it harder to detect deception compared to email",
-        "Attackers often have prepared scripts and answers to anticipated questions"
-      ],
-      practicalTips: [
-        "Never provide sensitive information to inbound callers, no matter how convincing they sound",
-        "Hang up and call back using the official number from the organisation's website",
-        "Implement a verification protocol for unexpected calls in your organisation"
-      ],
-      resources: [
-        "FTC Phone Scam resources",
-        "National Cyber Security Centre (NCSC) guidance on vishing"
-      ]
-    };
-  }
-  
-  /**
-   * Get website phishing feedback
-   */
-  static getWebsitePhishingFeedback(questionNumber, title) {
-    return {
-      title,
-      importance: "Phishing websites have become increasingly sophisticated, often perfectly mimicking legitimate sites while harvesting credentials or distributing malware.",
-      keyPoints: [
-        "Modern phishing sites frequently use HTTPS certificates, making the padlock symbol an unreliable security indicator",
-        "Domain typosquatting uses URLs that are visually similar to legitimate domains",
-        "Many phishing sites now duplicate entire legitimate websites, including functional elements",
-        "Homograph attacks use unicode characters that look identical to standard letters"
-      ],
-      practicalTips: [
-        "Manually type important URLs or use bookmarks rather than following links",
-        "Verify the full domain name carefully, including checking for extra subdomains",
-        "Use a password manager, which won't auto-fill credentials on mismatched domains"
-      ],
-      resources: [
-        "OWASP Web Security Testing Guide",
-        "Google Safe Browsing resources"
-      ]
-    };
-  }
-  
-  /**
-   * Get password security feedback
-   */
-  static getPasswordSecurityFeedback(questionNumber, title) {
-    return {
-      title,
-      importance: "Password compromise remains the primary method of account takeover, with poor password hygiene putting both personal and organisational security at risk.",
-      keyPoints: [
-        "Password reuse across sites means a breach at one service compromises all your accounts",
-        "Length is more important than complexity - consider using longer passphrases",
-        "Multi-factor authentication provides critical protection even if passwords are compromised",
-        "Password managers generate, store, and auto-fill unique credentials for each service"
-      ],
-      practicalTips: [
-        "Use a reputable password manager to create and store unique passwords",
-        "Enable multi-factor authentication on all important accounts",
-        "Check if your accounts have been involved in data breaches at haveibeenpwned.com"
-      ],
-      resources: [
-        "NIST Digital Identity Guidelines",
-        "EFF's Surveillance Self-Defense password recommendations"
-      ]
-    };
-  }
-  
-  /**
-   * Get social engineering feedback
-   */
-  static getSocialEngineeringFeedback(questionNumber, title) {
-    return {
-      title,
-      importance: "Social engineering bypasses technical security measures by exploiting human psychology, making it the foundation of most successful cyber attacks.",
-      keyPoints: [
-        "Social engineers exploit universal human tendencies: trust, fear, urgency, and desire to help",
-        "These attacks work across all communication channels: email, phone, text, social media, and in-person",
-        "Sophisticated attacks often combine multiple approaches and research targets extensively",
-        "Even security-conscious individuals can be vulnerable if the attacker has sufficient background information"
-      ],
-      practicalTips: [
-        "Verify requests through a different, trusted communication channel",
-        "Establish authentication procedures for sensitive requests within your organisation",
-        "Be skeptical of unexpected contact, especially those creating urgency or fear"
-      ],
-      resources: [
-        "Social-Engineer.org Framework",
-        "SANS Security Awareness social engineering modules"
-      ]
-    };
-  }
-  
-  /**
-   * Get general security feedback
-   */
-  static getGeneralSecurityFeedback(questionNumber, title, questionText) {
-    // Extract some keywords from the question to make feedback more relevant
-    const keywords = questionText.split(/\W+/).filter(word => 
-      word.length > 3 && !['what', 'when', 'where', 'which', 'would', 'could', 'should', 'this', 'that', 'these', 'those'].includes(word.toLowerCase())
-    );
-    
-    // Default feedback
-    const baseFeedback = {
-      title,
+      id: questionId,
+      title: title,
       importance: "A comprehensive understanding of security principles creates multiple layers of protection against the ever-evolving threat landscape.",
       keyPoints: [
         "Apply the principle of least privilege in all digital interactions",
@@ -1022,24 +998,9 @@ Make your feedback conversational, encouraging, and precisely targeted to the us
       resources: [
         "SANS Security Awareness Training resources",
         "National Cybersecurity Alliance Stay Safe Online"
-      ]
+      ],
+      questionNumber: questionNumber
     };
-    
-    // Try to customise based on keywords from the question
-    if (keywords.length > 0) {
-      // Pick two random keywords
-      const keyword1 = keywords[Math.floor(Math.random() * keywords.length)];
-      const keyword2 = keywords[Math.floor(Math.random() * keywords.length)];
-      
-      // Customise one key point and one practical tip
-      baseFeedback.keyPoints[0] = `Pay special attention to ${keyword1.toLowerCase()} when evaluating security situations`;
-      baseFeedback.practicalTips[0] = `Regularly review your approach to ${keyword2.toLowerCase()} security to ensure best practices`;
-    }
-    
-    // Always make the question number part of the title for uniqueness
-    baseFeedback.title = `${baseFeedback.title} (#${questionNumber})`;
-    
-    return baseFeedback;
   }
   
   /**

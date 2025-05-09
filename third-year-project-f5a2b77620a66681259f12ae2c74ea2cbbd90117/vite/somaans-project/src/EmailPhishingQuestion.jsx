@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faEnvelope,
   faCheck,
   faTimes,
   faInfoCircle,
@@ -12,101 +11,52 @@ import {
 const EmailPhishingQuestion = ({ question, onAnswer }) => {
   const [selectedElements, setSelectedElements] = useState([]);
   const [showExplanation, setShowExplanation] = useState(false);
-  const [highlightedElement, setHighlightedElement] = useState(null);
-  const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
-  const [tooltipContent, setTooltipContent] = useState("");
-  // Track which types of suspicious elements have been selected to prevent redundant selections
-  const [selectedTypes, setSelectedTypes] = useState({});
+  const [tooltipData, setTooltipData] = useState(null);
+  const emailRef = useRef(null);
 
-  const emailBodyRef = useRef(null);
-
-  // Reset tooltip when no element is highlighted
-  useEffect(() => {
-    if (!highlightedElement) {
-      setShowTooltip(false);
-    }
-  }, [highlightedElement]);
-
+  // Toggle selection of an element
   const toggleElement = (elementId) => {
     if (showExplanation) return; // Prevent changes after submission
 
-    const element = question.suspiciousElements.find((e) => e.id === elementId);
-    if (!element) return;
-
-    // If this element is already selected, unselect it
     if (selectedElements.includes(elementId)) {
       setSelectedElements(selectedElements.filter((id) => id !== elementId));
-
-      // Also update the selectedTypes object
-      if (element.type) {
-        setSelectedTypes((prev) => ({
-          ...prev,
-          [element.type]: false,
-        }));
-      }
-      return;
-    }
-
-    // If this type has already been selected and we're enforcing unique type selection
-    if (
-      element.type &&
-      selectedTypes[element.type] &&
-      question.uniqueTypeSelection
-    ) {
-      return; // Don't allow selection of this type again
-    }
-
-    // Otherwise, select this element
-    setSelectedElements([...selectedElements, elementId]);
-
-    // Update selectedTypes if the element has a type
-    if (element.type) {
-      setSelectedTypes((prev) => ({
-        ...prev,
-        [element.type]: true,
-      }));
+    } else {
+      setSelectedElements([...selectedElements, elementId]);
     }
   };
 
-  const handleElementMouseEnter = (element) => {
+  // Show tooltip when hovering over elements
+  const handleMouseMove = (e) => {
     if (showExplanation) return;
 
-    setHighlightedElement(element.id);
-    setTooltipContent(element.hint || element.description);
-    setShowTooltip(true);
+    // Find if mouse is over any suspicious element
+    const elements = question.suspiciousElements;
+
+    // Hide tooltip when not over any suspicious element
+    setTooltipData(null);
+
+    // Check each element if it contains the current mouse position
+    elements.forEach((element) => {
+      if (e.target.dataset.elementId === element.id) {
+        setTooltipData({
+          id: element.id,
+          content: element.hint || element.description,
+          x: e.clientX + 10,
+          y: e.clientY - 30,
+        });
+      }
+    });
   };
 
-  const handleElementMouseLeave = () => {
-    setHighlightedElement(null);
-  };
-
-  const handleMouseMove = (e) => {
-    if (showTooltip) {
-      // Position tooltip near cursor but avoid edges
-      const rect = emailBodyRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left + 10; // 10px offset from cursor
-      const y = e.clientY - rect.top - 30; // 30px above cursor
-
-      setTooltipPosition({ x, y });
-    }
-  };
-
+  // Handle answer submission
   const handleSubmit = () => {
-    // Check if the question has any elements explicitly marked as not suspicious
-    const hasExplicitDecoys = question.suspiciousElements.some(
-      (element) => element.isCorrect === false
-    );
+    // Get correct elements (those not explicitly marked as false)
+    const correctElements = question.suspiciousElements
+      .filter((element) => element.isCorrect !== false)
+      .map((el) => el.id);
 
-    // Get correct elements based on whether explicit marking exists
-    const correctElements = hasExplicitDecoys
-      ? question.suspiciousElements
-          .filter((element) => element.isCorrect !== false)
-          .map((el) => el.id)
-      : question.suspiciousElements.map((el) => el.id); // If no explicit marking, assume all are correct
-
-    // Get decoy elements (incorrect options)
-    const decoyElements = question.suspiciousElements
+    // Get incorrect elements (those explicitly marked as false)
+    const incorrectElements = question.suspiciousElements
       .filter((element) => element.isCorrect === false)
       .map((el) => el.id);
 
@@ -115,24 +65,17 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
       correctElements.includes(id)
     );
     const falsePositives = selectedElements.filter((id) =>
-      decoyElements.includes(id)
+      incorrectElements.includes(id)
     );
     const falseNegatives = correctElements.filter(
       (id) => !selectedElements.includes(id)
     );
 
-    // Calculate score
-    // Each true positive is worth 10 points
-    const truePositivePoints = truePositives.length * 10;
-    // Each false positive results in a 5 point deduction
-    const falsePositiveDeduction = falsePositives.length * 5;
-
-    // Calculate earned points (ensuring it's never negative)
+    // Calculate points
     const earnedPoints = Math.max(
       0,
-      truePositivePoints - falsePositiveDeduction
+      truePositives.length * 10 - falsePositives.length * 5
     );
-    // Total possible points is 10 points per correct element
     const maxPoints = correctElements.length * 10;
 
     // Calculate percentage score
@@ -142,7 +85,7 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
         : 0;
 
     setShowExplanation(true);
-    setShowTooltip(false);
+    setTooltipData(null);
 
     onAnswer({
       score,
@@ -156,253 +99,152 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
     });
   };
 
-  // Helper function to determine if an element should be selectable based on uniqueness rules
-  const isElementSelectable = (element) => {
-    // If we're not enforcing unique type selection, all elements are selectable
-    if (!question.uniqueTypeSelection) return true;
+  // Render email content with selectable elements
+  const renderEmail = () => {
+    const { emailContent } = question;
 
-    // If this element is already selected, it's selectable (for unselecting)
-    if (selectedElements.includes(element.id)) return true;
+    // Create a map of suspicious elements for easier lookup
+    const elementMap = {};
+    question.suspiciousElements.forEach((element) => {
+      elementMap[element.id] = element;
+    });
 
-    // If this element type is already selected, it's not selectable
-    if (element.type && selectedTypes[element.type]) return false;
+    // Helper function to mark selectable email parts
+    const markSelectable = (content, elementId) => {
+      const element = elementMap[elementId];
+      const isSelected = selectedElements.includes(elementId);
+      const showMissed =
+        showExplanation && element.isCorrect !== false && !isSelected;
+      const showIncorrect =
+        showExplanation && element.isCorrect === false && isSelected;
 
-    // Otherwise, it's selectable
-    return true;
-  };
+      return (
+        <span
+          key={elementId}
+          data-element-id={elementId}
+          className={`selectable-element
+            ${isSelected ? "selected-element" : ""}
+            ${showMissed ? "missed-element" : ""}
+            ${showIncorrect ? "incorrect-element" : ""}
+          `}
+          onClick={() => toggleElement(elementId)}
+        >
+          {content}
+          {isSelected && (
+            <span className="selection-icon">
+              <FontAwesomeIcon icon={faExclamationTriangle} />
+            </span>
+          )}
+        </span>
+      );
+    };
 
-  // Render email sections (sender, subject, etc.) with clickable areas
-  const renderEmailField = (fieldName, fieldValue) => {
-    // Find if any suspicious elements are in this field
-    const suspiciousElementsInField = question.suspiciousElements.filter(
-      (element) => {
-        const fieldLabel = fieldName.toLowerCase();
-        const description = element.description.toLowerCase();
-
-        // If uniqueTypeSelection is enabled and this type is already selected, skip
-        if (!isElementSelectable(element)) return false;
-
-        return (
-          (element.field && element.field.toLowerCase() === fieldLabel) ||
-          description.includes(fieldLabel) ||
-          (description.includes("email address") && fieldLabel === "from") ||
-          (description.includes("subject line") && fieldLabel === "subject")
-        );
-      }
-    );
-
-    if (suspiciousElementsInField.length > 0) {
-      // This field has suspicious elements, make it selectable
+    // Render email header fields (from, to, subject, date)
+    const renderHeaderField = (label, value, elementId) => {
       return (
         <div className="email-field">
-          <span className="email-label">{fieldName}:</span>
-          {suspiciousElementsInField.map((element) => (
-            <span
-              key={element.id}
-              className={`email-value selectable-element 
-                ${
-                  selectedElements.includes(element.id)
-                    ? "selected-element"
-                    : ""
-                }
-                ${
-                  highlightedElement === element.id ? "highlighted-element" : ""
-                }
-                ${
-                  showExplanation &&
-                  element.isCorrect !== false &&
-                  !selectedElements.includes(element.id)
-                    ? "missed-element"
-                    : ""
-                } 
-                ${
-                  showExplanation &&
-                  element.isCorrect === false &&
-                  selectedElements.includes(element.id)
-                    ? "incorrect-element"
-                    : ""
-                }`}
-              onClick={() => toggleElement(element.id)}
-              onMouseEnter={() => handleElementMouseEnter(element)}
-              onMouseLeave={handleElementMouseLeave}
-            >
-              {fieldValue}
-              {selectedElements.includes(element.id) && (
-                <FontAwesomeIcon
-                  icon={faExclamationTriangle}
-                  className="selection-icon"
-                />
-              )}
-            </span>
-          ))}
+          <span className="field-label">{label}:</span>
+          {elementId ? (
+            markSelectable(value, elementId)
+          ) : (
+            <span className="field-value">{value}</span>
+          )}
         </div>
       );
-    }
+    };
 
-    // No suspicious elements in this field, render normally
-    return (
-      <div className="email-field">
-        <span className="email-label">{fieldName}:</span>
-        <span className="email-value">{fieldValue}</span>
-      </div>
+    // Find which elements correspond to which email parts
+    const findElementForField = (fieldName) => {
+      return question.suspiciousElements.find(
+        (element) =>
+          element.field === fieldName.toLowerCase() ||
+          (element.description &&
+            element.description.toLowerCase().includes(fieldName.toLowerCase()))
+      );
+    };
+
+    // Parse email body content
+    const renderEmailBody = () => {
+      // Split body into paragraphs
+      const paragraphs = emailContent.body.split("\n\n");
+
+      return paragraphs.map((paragraph, index) => {
+        // Find any elements that match this paragraph
+        const matchingElements = question.suspiciousElements.filter(
+          (element) => element.content && paragraph.includes(element.content)
+        );
+
+        if (matchingElements.length === 0) {
+          // Regular paragraph with no suspicious elements
+          return (
+            <p key={index} dangerouslySetInnerHTML={{ __html: paragraph }} />
+          );
+        }
+
+        // Use the first matching element
+        const element = matchingElements[0];
+        return <p key={index}>{markSelectable(paragraph, element.id)}</p>;
+      });
+    };
+
+    // Find elements for email fields
+    const fromElement = findElementForField("from");
+    const subjectElement = findElementForField("subject");
+    const linkElement = question.suspiciousElements.find(
+      (element) =>
+        element.description &&
+        element.description.toLowerCase().includes("link")
     );
-  };
-
-  // Break email body into paragraphs and make appropriate sections clickable
-  const renderEmailBody = () => {
-    // Parse email body into paragraphs
-    const paragraphs = question.emailContent.body.split("\n\n");
 
     return (
       <div
-        className="email-body"
-        ref={emailBodyRef}
+        className="email-container"
+        ref={emailRef}
         onMouseMove={handleMouseMove}
       >
-        {paragraphs.map((paragraph, paraIndex) => {
-          // Find ALL suspicious elements that match this paragraph
-          const matchingElements = question.suspiciousElements.filter(
-            (element) => element.content && paragraph.includes(element.content)
-          );
-
-          // If no suspicious elements for this paragraph, render it normally
-          if (matchingElements.length === 0) {
-            return (
-              <p
-                key={paraIndex}
-                dangerouslySetInnerHTML={{ __html: paragraph }}
-              />
-            );
-          }
-
-          // Render paragraph ONCE with all matching elements data combined
-          // This prevents duplicate paragraphs but allows all elements to be detected
-          const combinedElementsData = {
-            id: `para-${paraIndex}`,
-            elementIds: matchingElements.map((el) => el.id),
-            hints: matchingElements.map((el) => el.hint || el.description),
-            selectedCount: matchingElements.filter((el) =>
-              selectedElements.includes(el.id)
-            ).length,
-            isHighlighted: matchingElements.some(
-              (el) => highlightedElement === el.id
-            ),
-            isMissed:
-              showExplanation &&
-              matchingElements.some(
-                (el) =>
-                  el.isCorrect !== false && !selectedElements.includes(el.id)
-              ),
-            isIncorrect:
-              showExplanation &&
-              matchingElements.some(
-                (el) =>
-                  el.isCorrect === false && selectedElements.includes(el.id)
-              ),
-          };
-
-          // Create a clickable element that allows selection of any matching element
-          return (
-            <p
-              key={`para-${paraIndex}`}
-              className={`selectable-element 
-                ${
-                  combinedElementsData.selectedCount > 0
-                    ? "selected-element"
-                    : ""
-                } 
-                ${
-                  combinedElementsData.isHighlighted
-                    ? "highlighted-element"
-                    : ""
-                }
-                ${combinedElementsData.isMissed ? "missed-element" : ""} 
-                ${combinedElementsData.isIncorrect ? "incorrect-element" : ""}`}
-              onClick={() => {
-                // When clicking, choose the first non-selected element to select
-                // Or if all are selected, then unselect the first one
-                const firstNonSelected = matchingElements.find(
-                  (el) => !selectedElements.includes(el.id)
-                );
-                if (firstNonSelected) {
-                  toggleElement(firstNonSelected.id);
-                } else if (matchingElements.length > 0) {
-                  toggleElement(matchingElements[0].id);
-                }
-              }}
-              onMouseEnter={() => {
-                // When hovering, show tooltip for the first matching element
-                if (matchingElements.length > 0) {
-                  handleElementMouseEnter(matchingElements[0]);
-                }
-              }}
-              onMouseLeave={handleElementMouseLeave}
-            >
-              {paragraph}
-              {combinedElementsData.selectedCount > 0 && (
-                <span className="selection-indicator">
-                  <FontAwesomeIcon
-                    icon={faExclamationTriangle}
-                    className="selection-icon"
-                  />
-                </span>
-              )}
-            </p>
-          );
-        })}
-
-        {/* Only render the link separately if it's NOT already contained in a paragraph */}
-        {question.emailContent.body.includes("Account Verification Portal") &&
-          !paragraphs.some((p) =>
-            p.includes("Account Verification Portal")
-          ) && (
-            <div
-              className={`email-link selectable-element
-              ${selectedElements.includes("element3") ? "selected-element" : ""}
-              ${highlightedElement === "element3" ? "highlighted-element" : ""}
-              ${
-                showExplanation && !selectedElements.includes("element3")
-                  ? "missed-element"
-                  : ""
-              }`}
-              onClick={() => toggleElement("element3")}
-              onMouseEnter={() =>
-                handleElementMouseEnter(
-                  question.suspiciousElements.find((e) => e.id === "element3")
-                )
-              }
-              onMouseLeave={handleElementMouseLeave}
-            >
-              <a href="#" onClick={(e) => e.preventDefault()}>
-                Account Verification Portal
-              </a>
-              {selectedElements.includes("element3") && (
-                <span className="selection-indicator">
-                  <FontAwesomeIcon
-                    icon={faExclamationTriangle}
-                    className="selection-icon"
-                  />
-                </span>
-              )}
-            </div>
+        <div className="email-header">
+          {renderHeaderField("From", emailContent.from, fromElement?.id)}
+          {renderHeaderField("To", emailContent.to)}
+          {renderHeaderField(
+            "Subject",
+            emailContent.subject,
+            subjectElement?.id
           )}
+          {renderHeaderField("Date", emailContent.date)}
+        </div>
 
-        {question.emailContent.signature && (
-          <div className="email-signature">
-            {question.emailContent.signature}
-          </div>
-        )}
+        <div className="email-body">
+          {renderEmailBody()}
+
+          {/* Separately handle links if they're not in paragraphs */}
+          {linkElement &&
+            !emailContent.body.includes("Account Verification Portal") && (
+              <div className="email-link-container">
+                {markSelectable(
+                  <a href="#" onClick={(e) => e.preventDefault()}>
+                    Account Verification Portal
+                  </a>,
+                  linkElement.id
+                )}
+              </div>
+            )}
+
+          {/* Render signature if present */}
+          {emailContent.signature && (
+            <div className="email-signature">{emailContent.signature}</div>
+          )}
+        </div>
 
         {/* Tooltip */}
-        {showTooltip && (
+        {tooltipData && (
           <div
             className="element-tooltip"
             style={{
-              top: `${tooltipPosition.y}px`,
-              left: `${tooltipPosition.x}px`,
+              left: `${tooltipData.x}px`,
+              top: `${tooltipData.y}px`,
             }}
           >
-            {tooltipContent}
+            {tooltipData.content}
           </div>
         )}
       </div>
@@ -410,10 +252,10 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
   };
 
   return (
-    <div className="email-phishing-container">
-      <h3 className="question-text">{question.question}</h3>
+    <div className="email-phishing-question">
+      <h3 className="question-title">{question.question}</h3>
 
-      <div className="selection-instruction">
+      <div className="instruction-box">
         <FontAwesomeIcon icon={faInfoCircle} />
         <span>
           Click on suspicious elements in the email to identify potential
@@ -422,35 +264,8 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
         </span>
       </div>
 
-      {/* Help button with tooltip - Moved to a floating position */}
-      <div className="help-container">
-        <button className="help-button" title="Click for help">
-          <FontAwesomeIcon icon={faQuestionCircle} />
-          <span className="help-text">Help</span>
-        </button>
-        <div className="help-tooltip">
-          <p>Common phishing signs include:</p>
-          <ul>
-            <li>Suspicious sender domains (not matching the company)</li>
-            <li>Urgency or threatening language</li>
-            <li>Suspicious links (hover to check URLs)</li>
-            <li>Poor grammar or spelling mistakes</li>
-            <li>Requests for personal information</li>
-          </ul>
-        </div>
-      </div>
-
       {/* Email viewer */}
-      <div className="email-viewer">
-        <div className="email-header">
-          {renderEmailField("From", question.emailContent.from)}
-          {renderEmailField("To", question.emailContent.to)}
-          {renderEmailField("Subject", question.emailContent.subject)}
-          {renderEmailField("Date", question.emailContent.date)}
-        </div>
-
-        {renderEmailBody()}
-      </div>
+      <div className="email-viewer">{renderEmail()}</div>
 
       {/* Selected elements summary */}
       <div className="selections-summary">
@@ -458,7 +273,7 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
           Selected Suspicious Elements ({selectedElements.length})
           {showExplanation && (
             <span className="correct-count">
-              -{" "}
+              {" - "}
               {
                 selectedElements.filter((id) =>
                   question.suspiciousElements.find(
@@ -508,7 +323,7 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
         )}
       </div>
 
-      {/* Submit button */}
+      {/* Submit or show explanation */}
       {!showExplanation ? (
         <button
           className="submit-btn"
@@ -525,7 +340,7 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
           <h4>Suspicious Elements You Should Have Identified:</h4>
           <ul className="suspicious-elements-list">
             {question.suspiciousElements
-              .filter((element) => element.isCorrect !== false) // Only show genuinely suspicious elements
+              .filter((element) => element.isCorrect !== false)
               .map((element) => (
                 <li
                   key={element.id}
@@ -548,7 +363,7 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
               ))}
           </ul>
 
-          {/* Only show false positives if the user selected any non-suspicious elements */}
+          {/* Show false positives if any */}
           {question.suspiciousElements.filter(
             (element) =>
               element.isCorrect === false &&
@@ -579,8 +394,26 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
         </div>
       )}
 
+      {/* Help button with tooltip */}
+      <div className="help-container">
+        <button className="help-button" title="Click for help">
+          <FontAwesomeIcon icon={faQuestionCircle} />
+          <span className="help-text">Help</span>
+        </button>
+        <div className="help-tooltip">
+          <p>Common phishing signs include:</p>
+          <ul>
+            <li>Suspicious sender domains (not matching the company)</li>
+            <li>Urgency or threatening language</li>
+            <li>Suspicious links (hover to check URLs)</li>
+            <li>Poor grammar or spelling mistakes</li>
+            <li>Requests for personal information</li>
+          </ul>
+        </div>
+      </div>
+
       <style jsx>{`
-        .email-phishing-container {
+        .email-phishing-question {
           background-color: #1a1a1a;
           border-radius: 12px;
           padding: 1.5rem;
@@ -588,221 +421,156 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
           position: relative;
         }
 
-        .help-container {
-          position: fixed;
-          bottom: 2rem;
-          right: 2rem;
-          z-index: 100;
+        .question-title {
+          color: #ffffff;
+          margin-top: 0;
+          margin-bottom: 1rem;
         }
 
-        .help-button {
-          background-color: #3498db;
-          color: white;
-          border: none;
-          border-radius: 50%;
-          width: 42px;
-          height: 42px;
+        .instruction-box {
           display: flex;
           align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          position: relative;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        }
-
-        .help-text {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          padding: 0;
-          margin: -1px;
-          overflow: hidden;
-          clip: rect(0, 0, 0, 0);
-          white-space: nowrap;
-          border-width: 0;
-        }
-
-        .help-tooltip {
-          position: absolute;
-          bottom: 110%;
-          right: 0;
-          margin-bottom: 10px;
-          width: 300px;
-          background-color: #34495e;
-          color: #ecf0f1;
-          padding: 12px;
+          gap: 10px;
+          margin-bottom: 1rem;
+          padding: 0.75rem;
+          background-color: rgba(52, 152, 219, 0.1);
           border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-          z-index: 100;
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.2s ease;
-        }
-
-        .help-tooltip p {
-          margin-top: 0;
-          margin-bottom: 0.5rem;
-          font-weight: bold;
-        }
-
-        .help-tooltip ul {
-          margin: 0;
-          padding-left: 1.5rem;
-        }
-
-        .help-tooltip li {
-          margin-bottom: 0.25rem;
-        }
-
-        .help-container:hover .help-tooltip {
-          opacity: 1;
-          pointer-events: auto;
+          color: #e0e0e0;
         }
 
         .email-viewer {
-          background-color: #fff;
+          background-color: #f8f9fa;
           border-radius: 8px;
           overflow: hidden;
           margin: 1.5rem 0;
-          position: relative;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .email-container {
+          position: relative;
           color: #333;
         }
 
         .email-header {
-          background-color: #f5f5f5;
-          padding: 12px 16px;
-          border-bottom: 1px solid #e0e0e0;
+          background-color: #f1f3f5;
+          padding: 1rem;
+          border-bottom: 1px solid #dee2e6;
         }
 
         .email-field {
-          margin-bottom: 8px;
-          font-size: 14px;
+          margin-bottom: 0.5rem;
           display: flex;
+          align-items: flex-start;
         }
 
-        .email-label {
+        .email-field:last-child {
+          margin-bottom: 0;
+        }
+
+        .field-label {
           font-weight: bold;
-          margin-right: 8px;
           width: 60px;
-          display: inline-block;
+          margin-right: 0.5rem;
         }
 
-        .email-value {
+        .field-value {
           flex: 1;
-          word-break: break-word;
-        }
-
-        .selectable-element {
-          cursor: pointer;
-          border: 2px solid transparent;
-          border-radius: 4px;
-          transition: all 0.2s ease;
-          position: relative;
-          padding: 2px 4px;
-          margin: -2px -4px;
-        }
-
-        .selectable-element:hover {
-          border-color: rgba(52, 152, 219, 0.5);
-          background-color: rgba(52, 152, 219, 0.1);
-        }
-
-        .selected-element {
-          border-color: #e74c3c;
-          background-color: rgba(231, 76, 60, 0.1);
-        }
-
-        .highlighted-element {
-          border-color: #3498db;
-          background-color: rgba(52, 152, 219, 0.2);
-        }
-
-        .missed-element {
-          border-color: #f39c12;
-          background-color: rgba(243, 156, 18, 0.1);
-        }
-
-        .incorrect-element {
-          border-color: #e74c3c;
-          background-color: rgba(231, 76, 60, 0.1);
         }
 
         .email-body {
-          padding: 20px;
-          position: relative;
-          min-height: 200px;
-          color: #333;
+          padding: 1.25rem;
+          line-height: 1.5;
         }
 
         .email-body p {
-          margin-bottom: 16px;
-          line-height: 1.5;
-          position: relative;
-        }
-
-        .email-link {
-          margin: 16px 0;
-          display: inline-block;
-        }
-
-        .email-link a {
-          color: #3498db;
-          text-decoration: underline;
+          margin-bottom: 1rem;
         }
 
         .email-signature {
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid #e0e0e0;
-          color: #777;
+          margin-top: 1rem;
+          padding-top: 1rem;
+          border-top: 1px solid #dee2e6;
+          color: #6c757d;
           font-size: 0.9em;
         }
 
-        .selection-indicator {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          margin-left: 8px;
-          color: #e74c3c;
+        .email-link-container {
+          margin: 1rem 0;
+        }
+
+        .email-link-container a {
+          color: #0d6efd;
+          text-decoration: underline;
+        }
+
+        /* Selectable elements */
+        .selectable-element {
+          cursor: pointer;
+          position: relative;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+        }
+
+        .selectable-element:hover {
+          background-color: rgba(52, 152, 219, 0.1);
+          box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.4);
+        }
+
+        .selected-element {
+          background-color: rgba(231, 76, 60, 0.1);
+          box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.4);
+        }
+
+        .missed-element {
+          background-color: rgba(243, 156, 18, 0.1);
+          box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.4);
+        }
+
+        .incorrect-element {
+          background-color: rgba(231, 76, 60, 0.1);
+          box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.4);
         }
 
         .selection-icon {
-          font-size: 0.9em;
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background-color: #e74c3c;
+          color: white;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
         }
 
+        /* Tooltip */
         .element-tooltip {
-          position: absolute;
-          background-color: #34495e;
-          color: #ecf0f1;
-          padding: 8px 12px;
+          position: fixed;
+          background-color: #343a40;
+          color: #fff;
+          padding: 0.5rem 0.75rem;
           border-radius: 4px;
-          font-size: 0.9rem;
+          font-size: 0.875rem;
           max-width: 250px;
-          z-index: 5;
+          z-index: 1000;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
           pointer-events: none;
+          transform: translate(0, -100%);
         }
 
-        .element-tooltip::after {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 15px;
-          border-width: 6px;
-          border-style: solid;
-          border-color: #34495e transparent transparent transparent;
-        }
-
+        /* Selections summary */
         .selections-summary {
-          background-color: #242424;
+          background-color: #212529;
           border-radius: 8px;
           padding: 1rem;
           margin: 1.5rem 0;
         }
 
         .selections-summary h4 {
-          color: #ecf0f1;
+          color: #f8f9fa;
           margin-top: 0;
           margin-bottom: 1rem;
           font-size: 1rem;
@@ -810,6 +578,7 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
 
         .correct-count {
           color: #2ecc71;
+          font-weight: normal;
         }
 
         .selected-items-list {
@@ -839,6 +608,7 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
 
         .item-icon {
           margin-left: 0.5rem;
+          flex-shrink: 0;
         }
 
         .item-icon.correct {
@@ -850,26 +620,16 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
         }
 
         .no-selections {
-          color: #95a5a6;
+          color: #adb5bd;
           font-style: italic;
           text-align: center;
         }
 
-        .selection-instruction {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 16px;
-          color: #e0e0e0;
-          background-color: rgba(52, 152, 219, 0.1);
-          padding: 12px;
-          border-radius: 8px;
-        }
-
+        /* Submit button */
         .submit-btn {
           background-color: #3498db;
           color: white;
-          padding: 12px 24px;
+          padding: 0.75rem 1rem;
           border-radius: 6px;
           border: none;
           font-weight: bold;
@@ -883,13 +643,14 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
         }
 
         .submit-btn:disabled {
-          background-color: #95a5a6;
+          background-color: #adb5bd;
           cursor: not-allowed;
         }
 
+        /* Explanation */
         .explanation-container {
-          margin-top: 24px;
-          padding: 16px;
+          margin-top: 1.5rem;
+          padding: 1rem;
           background-color: #2c3e50;
           border-radius: 8px;
           color: #ecf0f1;
@@ -897,29 +658,28 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
 
         .explanation-container h4 {
           margin-top: 0;
-          margin-bottom: 12px;
+          margin-bottom: 0.75rem;
           color: #3498db;
         }
 
         .explanation-container p {
           line-height: 1.6;
-          margin-bottom: 16px;
+          margin-bottom: 1rem;
         }
 
         .suspicious-elements-list,
         .false-positives-list {
           list-style: none;
           padding: 0;
-          margin: 0;
-          margin-bottom: 16px;
+          margin: 0 0 1rem 0;
         }
 
         .suspicious-elements-list li,
         .false-positives-list li {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 8px 0;
+          gap: 0.5rem;
+          padding: 0.5rem 0;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -950,34 +710,89 @@ const EmailPhishingQuestion = ({ question, onAnswer }) => {
           margin-left: auto;
           background-color: #2ecc71;
           color: white;
-          padding: 4px 8px;
+          padding: 0.25rem 0.5rem;
           border-radius: 4px;
-          font-size: 0.85rem;
+          font-size: 0.75rem;
         }
 
         .points-deducted {
           margin-left: auto;
           background-color: #e74c3c;
           color: white;
-          padding: 4px 8px;
+          padding: 0.25rem 0.5rem;
           border-radius: 4px;
-          font-size: 0.85rem;
+          font-size: 0.75rem;
         }
 
+        /* Help button */
+        .help-container {
+          position: fixed;
+          bottom: 2rem;
+          right: 2rem;
+          z-index: 100;
+        }
+
+        .help-button {
+          background-color: #3498db;
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 42px;
+          height: 42px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .help-text {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border-width: 0;
+        }
+
+        .help-tooltip {
+          position: absolute;
+          bottom: 110%;
+          right: 0;
+          width: 300px;
+          background-color: #343a40;
+          color: #f8f9fa;
+          padding: 1rem;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease;
+        }
+
+        .help-tooltip p {
+          margin-top: 0;
+          margin-bottom: 0.5rem;
+          font-weight: bold;
+        }
+
+        .help-tooltip ul {
+          margin: 0;
+          padding-left: 1.5rem;
+        }
+
+        .help-tooltip li {
+          margin-bottom: 0.25rem;
+        }
+
+        .help-container:hover .help-tooltip {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        /* Responsive styles */
         @media (max-width: 768px) {
-          .email-phishing-container {
-            padding: 1rem;
-          }
-
-          .selections-summary {
-            padding: 0.75rem;
-          }
-
-          .help-container {
-            bottom: 1rem;
-            right: 1rem;
-          }
-
           .help-tooltip {
             width: 250px;
             right: -100px;

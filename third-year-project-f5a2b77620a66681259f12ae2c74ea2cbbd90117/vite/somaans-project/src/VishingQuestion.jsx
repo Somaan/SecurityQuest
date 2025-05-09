@@ -108,7 +108,7 @@ const VishingQuestion = ({ question, onAnswer }) => {
           Select all suspicious elements in this call (choose carefully):
         </h4>
 
-        <div className="options-list">
+        <div className="options-grid">
           {question.options.map((option) => (
             <div
               key={option.id}
@@ -125,33 +125,36 @@ const VishingQuestion = ({ question, onAnswer }) => {
                           }`}
               onClick={() => toggleOption(option.id)}
             >
-              <div className="option-checkbox">
-                {selectedOptions.includes(option.id) && (
-                  <FontAwesomeIcon icon={faCheck} />
-                )}
+              <div className="option-header">
+                <div className="option-checkbox">
+                  {selectedOptions.includes(option.id) && (
+                    <FontAwesomeIcon icon={faCheck} />
+                  )}
+                </div>
+                <div className="option-text">{option.text}</div>
               </div>
-              <div className="option-text">{option.text}</div>
 
-              {submitted &&
-                option.isCorrect &&
-                selectedOptions.includes(option.id) && (
-                  <div className="option-points">+10 points</div>
-                )}
+              {/* Only show results after submission */}
+              {submitted && (
+                <div className="option-footer">
+                  {option.isCorrect && selectedOptions.includes(option.id) && (
+                    <div className="option-points">+10 points</div>
+                  )}
 
-              {submitted &&
-                option.isCorrect &&
-                !selectedOptions.includes(option.id) && (
-                  <div className="option-missed">Missed</div>
-                )}
+                  {option.isCorrect && !selectedOptions.includes(option.id) && (
+                    <div className="option-missed">Missed</div>
+                  )}
 
-              {submitted &&
-                !option.isCorrect &&
-                selectedOptions.includes(option.id) && (
-                  <div className="option-incorrect">-5 points</div>
-                )}
+                  {!option.isCorrect && selectedOptions.includes(option.id) && (
+                    <div className="option-incorrect">-5 points</div>
+                  )}
 
-              {submitted && option.explanation && (
-                <div className="option-explanation">{option.explanation}</div>
+                  {option.explanation && (
+                    <div className="option-explanation">
+                      {option.explanation}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ))}
@@ -210,6 +213,8 @@ const VishingQuestion = ({ question, onAnswer }) => {
           padding: 16px;
           color: #ecf0f1;
           white-space: pre-wrap;
+          max-height: 300px;
+          overflow-y: auto;
         }
 
         .dialog-exchange {
@@ -231,40 +236,50 @@ const VishingQuestion = ({ question, onAnswer }) => {
           margin-bottom: 16px;
         }
 
-        .options-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
+        /* Fixed grid layout with explicit sizing */
+        .options-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr); /* Always 2 columns */
+          gap: 16px;
         }
 
         .vishing-option {
           display: flex;
-          align-items: flex-start;
-          padding: 12px;
+          flex-direction: column;
+          padding: 16px;
           background-color: #2c3e50;
           border-radius: 8px;
           cursor: pointer;
           transition: all 0.2s ease;
+          min-height: 100px; /* Minimum height to avoid squishing */
           position: relative;
+          border: 2px solid transparent;
         }
 
         .vishing-option:hover {
           background-color: #34495e;
+          transform: translateY(-2px);
         }
 
         .vishing-option.selected {
           background-color: rgba(52, 152, 219, 0.2);
-          border: 1px solid rgba(52, 152, 219, 0.5);
+          border-color: #3498db;
         }
 
         .vishing-option.correct {
           background-color: rgba(46, 204, 113, 0.2);
-          border: 1px solid rgba(46, 204, 113, 0.5);
+          border-color: #2ecc71;
         }
 
         .vishing-option.incorrect {
           background-color: rgba(231, 76, 60, 0.2);
-          border: 1px solid rgba(231, 76, 60, 0.5);
+          border-color: #e74c3c;
+        }
+
+        .option-header {
+          display: flex;
+          margin-bottom: 12px;
+          align-items: flex-start;
         }
 
         .option-checkbox {
@@ -300,13 +315,19 @@ const VishingQuestion = ({ question, onAnswer }) => {
           flex: 1;
         }
 
+        .option-footer {
+          margin-top: auto;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          padding-top: 12px;
+        }
+
         .option-points {
           background-color: #2ecc71;
           color: white;
           padding: 4px 8px;
           border-radius: 4px;
           font-size: 0.85rem;
-          margin-left: 12px;
+          display: inline-block;
         }
 
         .option-missed {
@@ -315,7 +336,7 @@ const VishingQuestion = ({ question, onAnswer }) => {
           padding: 4px 8px;
           border-radius: 4px;
           font-size: 0.85rem;
-          margin-left: 12px;
+          display: inline-block;
         }
 
         .option-incorrect {
@@ -324,15 +345,13 @@ const VishingQuestion = ({ question, onAnswer }) => {
           padding: 4px 8px;
           border-radius: 4px;
           font-size: 0.85rem;
-          margin-left: 12px;
+          display: inline-block;
         }
 
         .option-explanation {
           margin-top: 8px;
           font-size: 0.9rem;
           color: #bdc3c7;
-          padding-top: 8px;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .submit-btn {
@@ -345,6 +364,7 @@ const VishingQuestion = ({ question, onAnswer }) => {
           cursor: pointer;
           transition: background-color 0.2s ease;
           margin-top: 20px;
+          width: 100%;
         }
 
         .submit-btn:hover {
@@ -372,6 +392,13 @@ const VishingQuestion = ({ question, onAnswer }) => {
         .explanation-box p {
           color: #ecf0f1;
           line-height: 1.6;
+        }
+
+        /* Media query for smaller screens */
+        @media (max-width: 768px) {
+          .options-grid {
+            grid-template-columns: 1fr; /* Switch to single column on mobile */
+          }
         }
       `}</style>
     </div>

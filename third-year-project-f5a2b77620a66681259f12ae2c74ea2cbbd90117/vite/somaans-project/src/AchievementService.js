@@ -4,7 +4,63 @@ class AchievementService {
   // Keep track of achievement cache
   static achievementCache = null;
   static newlyUnlockedAchievements = [];
-  static shownAchievements = new Set();
+  
+  // Initialize shownAchievements from localStorage
+  static shownAchievements = (() => {
+    try {
+      const userId = sessionStorage.getItem("userId") || "1";
+      const storedIds = localStorage.getItem(`shown_achievements_${userId}`);
+      return storedIds ? new Set(JSON.parse(storedIds)) : new Set();
+    } catch (e) {
+      console.error("Error loading shown achievements:", e);
+      return new Set();
+    }
+  })();
+  
+  static batchUnlockTimestamp = null;
+  
+  // Track the most recent unlocked achievement by user
+  static setMostRecentAchievement(userId, achievement) {
+    if (!achievement || !achievement.id || !achievement.title) return;
+    
+    try {
+      const achievementData = {
+        id: achievement.id,
+        title: achievement.title,
+        description: achievement.description,
+        icon: achievement.icon || 'trophy',
+        color: achievement.color || '#646cff',
+        timestamp: Date.now()
+      };
+      
+      localStorage.setItem(`most_recent_achievement_${userId}`, JSON.stringify(achievementData));
+    } catch (error) {
+      console.error('Error saving most recent achievement:', error);
+    }
+  }
+
+  // Get the most recent achievement for display
+  static getMostRecentAchievement(userId) {
+    try {
+      const achievementJSON = localStorage.getItem(`most_recent_achievement_${userId}`);
+      if (!achievementJSON) return null;
+      
+      return JSON.parse(achievementJSON);
+    } catch (error) {
+      console.error('Error getting most recent achievement:', error);
+      return null;
+    }
+  }
+  
+  // Helper method to save shown achievements to localStorage
+  static saveShownAchievements(userId) {
+    try {
+      localStorage.setItem(`shown_achievements_${userId}`, 
+        JSON.stringify([...this.shownAchievements]));
+    } catch (e) {
+      console.error("Error saving shown achievements:", e);
+    }
+  }
   
   // Check for new achievements by comparing previous and current achievement lists
   static async checkForNewAchievements(userId) {
@@ -171,12 +227,48 @@ class AchievementService {
         await this.saveAchievement(userId, achievement);
       }
       
+      // Set batch unlock timestamp to mark these achievements as part of the same batch
+      this.batchUnlockTimestamp = Date.now();
+      
       // Only return newly unlocked achievements for notification
       const newlyUnlocked = updatedAchievements.filter(achievement => 
         achievement.unlocked && 
         achievement.progress >= 100 && 
         !this.shownAchievements.has(achievement.id)
       );
+      
+      // If multiple achievements were unlocked, consolidate them into a single notification
+      if (newlyUnlocked.length > 1) {
+        // Return the first one, but mark it as a group with special properties
+        if (newlyUnlocked.length > 0) {
+          const consolidated = {...newlyUnlocked[0]};
+          consolidated.isGrouped = true;
+          consolidated.groupCount = newlyUnlocked.length;
+          consolidated.originalTitle = consolidated.title;
+          consolidated.originalDescription = consolidated.description;
+          consolidated.title = "Multiple Achievements Unlocked!";
+          consolidated.description = `You've unlocked ${newlyUnlocked.length} achievements at once`;
+          
+          // Mark all achievements in this batch as shown
+          for (const achievement of newlyUnlocked) {
+            this.shownAchievements.add(achievement.id);
+            // Save most recent achievement
+            this.setMostRecentAchievement(userId, achievement);
+          }
+          this.saveShownAchievements(userId);
+          
+          // Queue just the consolidated notification
+          this.queueAchievement(consolidated);
+          return [consolidated];
+        }
+      } else {
+        // Return individual achievements if there's just one
+        // If there's only one achievement, set it as most recent
+        if (newlyUnlocked.length === 1) {
+          this.setMostRecentAchievement(userId, newlyUnlocked[0]);
+        }
+        return newlyUnlocked;
+      }
       
       return newlyUnlocked;
     } catch (error) {
@@ -249,6 +341,9 @@ class AchievementService {
       // Queue for notification only if newly unlocked
       if (achievement.unlocked && achievement.progress >= 100 && !this.shownAchievements.has(achievement.id)) {
         this.queueAchievement(achievement);
+        
+        // Track this as the most recent achievement
+        this.setMostRecentAchievement(userId, achievement);
       }
       
       return true;
@@ -325,22 +420,40 @@ class AchievementService {
   
   // Queue a new achievement to be shown - Fixed to avoid duplicates
   static queueAchievement(achievement) {
-    if (!achievement || !achievement.id) {
+    if (!achievement || !achievement.id || !achievement.title) {
       console.error('Invalid achievement object:', achievement);
       return;
     }
     
-    if (this.shownAchievements.has(achievement.id)) {
-      console.log(`Achievement ${achievement.id} (${achievement.title}) already shown`);
+    const userId = sessionStorage.getItem("userId") || "1";
+    const storageKey = `shown_achievement_${userId}_${achievement.title}`;
+    
+    // If this is not a grouped achievement, check if already shown
+    if (!achievement.isGrouped && localStorage.getItem(storageKey)) {
+      console.log(`Achievement "${achievement.title}" already shown`);
       return;
     }
     
     // Check if this achievement is already in the queue
-    const exists = this.newlyUnlockedAchievements.some(a => a.id === achievement.id);
+    const exists = this.newlyUnlockedAchievements.some(a => 
+      (a.title === achievement.title) || 
+      (a.isGrouped && a.batchId === this.batchUnlockTimestamp)
+    );
+    
     if (!exists) {
-      console.log(`Queueing achievement ${achievement.id} (${achievement.title}) for display`);
+      console.log(`Queueing achievement "${achievement.title}" for display`);
+      
+      // Add batch ID for consolidated achievements
+      if (achievement.isGrouped) {
+        achievement.batchId = this.batchUnlockTimestamp;
+      } else {
+        // Save to localStorage by title
+        localStorage.setItem(storageKey, 'true');
+        this.shownAchievements.add(achievement.id);
+        this.saveShownAchievements(userId);
+      }
+      
       this.newlyUnlockedAchievements.push(achievement);
-      this.shownAchievements.add(achievement.id);
     }
   }
   
@@ -361,6 +474,11 @@ class AchievementService {
   // Reset shown achievements - useful when testing
   static resetShownAchievements() {
     this.shownAchievements.clear();
+    const userId = sessionStorage.getItem("userId") || "1";
+    localStorage.removeItem(`shown_achievements_${userId}`);
+    
+    // Also clear cached most recent achievement
+    localStorage.removeItem(`most_recent_achievement_${userId}`);
   }
   
   // Debug achievements helper
@@ -431,7 +549,18 @@ class AchievementService {
         }
       });
       
-      return mergedAchievements;
+      // Before returning, deduplicate by title if needed
+      const uniqueTitles = new Set();
+      const dedupedAchievements = [];
+      
+      for (const achievement of mergedAchievements) {
+        if (!uniqueTitles.has(achievement.title)) {
+          uniqueTitles.add(achievement.title);
+          dedupedAchievements.push(achievement);
+        }
+      }
+      
+      return dedupedAchievements;
     } catch (error) {
       console.error('Error getting all achievements:', error);
       return [];

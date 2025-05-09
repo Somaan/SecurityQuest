@@ -119,6 +119,9 @@ const AchievementNotification = ({ achievement, onClose }) => {
     title = "Achievement Unlocked",
     description = "You've earned a new achievement!",
     color = "#646cff",
+    isGrouped = false,
+    groupCount = 1,
+    originalTitle = "",
   } = achievement;
 
   return (
@@ -134,6 +137,11 @@ const AchievementNotification = ({ achievement, onClose }) => {
           <h3>Achievement Unlocked!</h3>
           <h4>{title}</h4>
           <p>{description}</p>
+
+          {/* Display badge for multiple achievements */}
+          {isGrouped && groupCount > 1 && (
+            <div className="achievement-count-badge">+{groupCount}</div>
+          )}
         </div>
         <button className="close-btn" onClick={onClose}>
           <FontAwesomeIcon icon={faTimes} />
@@ -291,6 +299,7 @@ const AchievementNotification = ({ achievement, onClose }) => {
 
         .achievement-details {
           flex: 1;
+          position: relative;
         }
 
         .achievement-details h3 {
@@ -309,6 +318,19 @@ const AchievementNotification = ({ achievement, onClose }) => {
           color: #b3b3b3;
           margin: 0;
           font-size: 0.85rem;
+        }
+
+        .achievement-count-badge {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background-color: #e74c3c;
+          color: white;
+          border-radius: 20px;
+          padding: 2px 8px;
+          font-size: 0.75rem;
+          font-weight: bold;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         .close-btn {

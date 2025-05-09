@@ -51,9 +51,6 @@ function App() {
   const hideNavBar = isQuizPage;
 
   // Check for remembered user on initial load
-  // In App.jsx, update the useEffect section that checks authentication:
-
-  // Check for remembered user on initial load
   useEffect(() => {
     const checkRememberedUser = async () => {
       // Check if user just logged out - if so, don't auto-login
@@ -151,9 +148,25 @@ function App() {
     }, 500);
   };
 
-  // Handle login state update
+  // Handle login state update with achievement display
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
+
+    // Show the most recent achievement after a brief delay
+    setTimeout(() => {
+      const userId = sessionStorage.getItem("userId") || "1";
+      const mostRecent = AchievementService.getMostRecentAchievement(userId);
+
+      if (mostRecent) {
+        console.log("Showing most recent achievement on login:", mostRecent);
+
+        // Clear any existing queue first
+        AchievementService.clearAchievementQueue();
+
+        // Show the most recent achievement
+        setCurrentAchievement(mostRecent);
+      }
+    }, 1500); // Delay to allow login animations to complete
   };
 
   // Show loading state while checking authentication
