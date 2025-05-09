@@ -8,6 +8,7 @@ import { API_ENDPOINTS } from "./constants";
 import { toast } from "react-toastify";
 import EnhancedGamifiedAchievements from "./EnhancedGamifiedAchievements";
 import AchievementService from "./AchievementService";
+import StreakDebugger from "./StreakDebugger";
 
 const Achievements = () => {
   const [achievements, setAchievements] = useState([]);
@@ -20,6 +21,12 @@ const Achievements = () => {
     const fetchAchievements = async () => {
       setLoading(true);
       try {
+        console.log("Initializing achievements component for user:", userId);
+
+        // First, sync streak data to ensure consistency
+        await AchievementService.syncStreakData(userId);
+        console.log("Streak data synchronized");
+
         // Call the real API endpoint
         console.log("Fetching achievements for user:", userId);
 
@@ -57,6 +64,38 @@ const Achievements = () => {
           achievementsData = await AchievementService.getAllAchievements(
             userId
           );
+        }
+
+        // Log streaks data for debugging
+        console.log("Displaying achievements with following streak data:");
+        const streakResponse = await fetch(
+          API_ENDPOINTS.GET_USER_STREAKS.replace(":userId", userId)
+        );
+        if (streakResponse.ok) {
+          const streakData = await streakResponse.json();
+          console.log(
+            "Current login streak:",
+            streakData.userData.login_streak
+          );
+          console.log(
+            "Longest login streak:",
+            streakData.userData.longest_login_streak
+          );
+
+          // Log achievement progress for streak-based achievements
+          const streakAchievements = achievementsData.filter(
+            (a) =>
+              a.title === "Dedicated User" ||
+              a.title === "Weekly Warrior" ||
+              a.title === "Monthly Master"
+          );
+
+          console.log("Streak-based achievements:");
+          streakAchievements.forEach((a) => {
+            console.log(
+              `${a.title}: ${a.progress}% progress, unlocked: ${a.unlocked}`
+            );
+          });
         }
 
         // Map the achievements to the format expected by EnhancedGamifiedAchievements
@@ -271,6 +310,9 @@ const Achievements = () => {
 
         {/* Use the enhanced achievements component */}
         <EnhancedGamifiedAchievements achievements={achievements} />
+
+        {/* Add the debug tool */}
+        <StreakDebugger userId={userId} />
       </div>
 
       <style jsx>{`

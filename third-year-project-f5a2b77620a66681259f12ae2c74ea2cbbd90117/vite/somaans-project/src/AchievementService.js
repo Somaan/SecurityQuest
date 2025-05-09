@@ -105,18 +105,61 @@ class AchievementService {
     }
   }
   
+  // New method to sync streak data between API and localStorage
+  static async syncStreakData(userId) {
+    try {
+        console.log(`Syncing streak data for user ${userId}`);
+        const response = await fetch(API_ENDPOINTS.GET_USER_STREAKS.replace(':userId', userId));
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.userData) {
+                // Save to localStorage as backup
+                localStorage.setItem(`login_streak_${userId}`, data.userData.login_streak || 0);
+                localStorage.setItem(`longest_login_streak_${userId}`, data.userData.longest_login_streak || 0);
+                localStorage.setItem(`quiz_streak_${userId}`, data.userData.quiz_streak || 0);
+                localStorage.setItem(`longest_quiz_streak_${userId}`, data.userData.longest_quiz_streak || 0);
+                
+                console.log('Streak data synchronized between API and localStorage');
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Error syncing streak data:', error);
+        return false;
+    }
+  }
+  
   // Check for streak-based achievements - FIXED with more reliable streak checking
   static async checkStreakAchievements(userId) {
     try {
       // Try to fetch streak data from API first
       let userData = {};
+      let apiSuccess = false;
       
       try {
+        console.log(`Fetching streak data from API for user ${userId}...`);
         const response = await fetch(API_ENDPOINTS.GET_USER_STREAKS.replace(':userId', userId));
         
         if (response.ok) {
           const data = await response.json();
           userData = data.userData || {};
+          apiSuccess = true;
+          console.log('Successfully fetched streak data from API');
+          console.log('Login streak:', userData.login_streak);
+          console.log('Longest login streak:', userData.longest_login_streak);
+          console.log('Quiz streak:', userData.quiz_streak);
+          console.log('Longest quiz streak:', userData.longest_quiz_streak);
+          
+          // If API provides a calculated streak, use it for verification
+          if (userData.calculatedStreak !== undefined) {
+            console.log(`API calculated streak: ${userData.calculatedStreak}`);
+            console.log(`Database streak: ${userData.login_streak}`);
+            if (userData.calculatedStreak !== userData.login_streak) {
+              console.warn(`Streak mismatch detected! API calculated ${userData.calculatedStreak} but database has ${userData.login_streak}`);
+            }
+          }
         } else {
           throw new Error('Failed to fetch user streaks from API');
         }
@@ -128,26 +171,38 @@ class AchievementService {
         
         userData = {
           login_streak: parseInt(loginStreak),
-          quiz_streak: parseInt(quizStreak)
+          longest_login_streak: parseInt(localStorage.getItem(`longest_login_streak_${userId}`) || loginStreak),
+          quiz_streak: parseInt(quizStreak),
+          longest_quiz_streak: parseInt(localStorage.getItem(`longest_quiz_streak_${userId}`) || quizStreak)
         };
+        
+        console.log('Using fallback streak data from localStorage:');
+        console.log('Login streak:', userData.login_streak);
+        console.log('Longest login streak:', userData.longest_login_streak);
       }
       
-      console.log("Checking streak achievements for user:", userId);
-      console.log("Current login streak:", userData.login_streak);
+      console.log("Computing achievement progress with the following streak data:");
+      console.log(JSON.stringify(userData, null, 2));
       
-      // Calculate progress percentages 
+      // Calculate progress percentages using maximum of current and longest streak for consistency
       const loginStreak = userData.login_streak || 0;
-      const dedicatedUserProgress = Math.min(100, (loginStreak / 3) * 100);
-      const weeklyWarriorProgress = Math.min(100, (loginStreak / 7) * 100);
-      const monthlyMasterProgress = Math.min(100, (loginStreak / 30) * 100);
+      const longestLoginStreak = userData.longest_login_streak || 0;
+      const effectiveLoginStreak = Math.max(loginStreak, longestLoginStreak);
       
-      console.log("Weekly warrior progress:", weeklyWarriorProgress.toFixed(1) + "%");
+      console.log(`Using effective login streak for achievements: ${effectiveLoginStreak}`);
+      
+      const dedicatedUserProgress = Math.min(100, (effectiveLoginStreak / 3) * 100);
+      const weeklyWarriorProgress = Math.min(100, (effectiveLoginStreak / 7) * 100);
+      const monthlyMasterProgress = Math.min(100, (effectiveLoginStreak / 30) * 100);
+      
+      console.log("Dedicated User progress:", dedicatedUserProgress.toFixed(1) + "%");
+      console.log("Weekly Warrior progress:", weeklyWarriorProgress.toFixed(1) + "%");
       console.log("Monthly Master progress:", monthlyMasterProgress.toFixed(1) + "%");
       
       const updatedAchievements = [];
       
       // Dedicated User (3-day login streak)
-      const dedicatedUserUnlocked = loginStreak >= 3;
+      const dedicatedUserUnlocked = effectiveLoginStreak >= 3;
       updatedAchievements.push({
         id: 1, // ID from database
         title: 'Dedicated User',
@@ -159,7 +214,7 @@ class AchievementService {
       });
       
       // Weekly Warrior (7-day login streak)
-      const weeklyWarriorUnlocked = loginStreak >= 7;
+      const weeklyWarriorUnlocked = effectiveLoginStreak >= 7;
       updatedAchievements.push({
         id: 2, // ID from database
         title: 'Weekly Warrior',
@@ -171,7 +226,7 @@ class AchievementService {
       });
       
       // Monthly Master (30-day login streak)
-      const monthlyMasterUnlocked = loginStreak >= 30;
+      const monthlyMasterUnlocked = effectiveLoginStreak >= 30;
       updatedAchievements.push({
         id: 3, // ID from database
         title: 'Monthly Master',
@@ -183,12 +238,13 @@ class AchievementService {
       });
       
       // Check quiz streak achievements - More reliable conditions
-      if (userData.quiz_streak > 0) {
-        const quizEnthusiastProgress = Math.min(100, (userData.quiz_streak / 3) * 100);
-        const quizChampionProgress = Math.min(100, (userData.quiz_streak / 7) * 100);
-        const securityExpertProgress = Math.min(100, (userData.quiz_streak / 14) * 100);
+      if (userData.quiz_streak > 0 || userData.longest_quiz_streak > 0) {
+        const effectiveQuizStreak = Math.max(userData.quiz_streak || 0, userData.longest_quiz_streak || 0);
+        const quizEnthusiastProgress = Math.min(100, (effectiveQuizStreak / 3) * 100);
+        const quizChampionProgress = Math.min(100, (effectiveQuizStreak / 7) * 100);
+        const securityExpertProgress = Math.min(100, (effectiveQuizStreak / 14) * 100);
         
-        const quizEnthusiastUnlocked = userData.quiz_streak >= 3;
+        const quizEnthusiastUnlocked = effectiveQuizStreak >= 3;
         updatedAchievements.push({
           id: 4, // ID from database
           title: 'Quiz Enthusiast',
@@ -199,7 +255,7 @@ class AchievementService {
           progress: quizEnthusiastProgress
         });
         
-        const quizChampionUnlocked = userData.quiz_streak >= 7;
+        const quizChampionUnlocked = effectiveQuizStreak >= 7;
         updatedAchievements.push({
           id: 5, // ID from database
           title: 'Quiz Champion',
@@ -210,7 +266,7 @@ class AchievementService {
           progress: quizChampionProgress
         });
         
-        const securityExpertUnlocked = userData.quiz_streak >= 14;
+        const securityExpertUnlocked = effectiveQuizStreak >= 14;
         updatedAchievements.push({
           id: 6, // ID from database
           title: 'Security Expert',
